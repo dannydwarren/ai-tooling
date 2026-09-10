@@ -28,6 +28,18 @@
       }
     },
     {
+      "id": "agent-audit",
+      "enabled": true,
+      "event": "SubagentStart",
+      "description": "Records every subagent spawn. SubagentStart is used rather than PreToolUse on the Agent tool because it fires however the subagent was started, and carries agent_type directly.",
+      "hook": {
+        "type": "command",
+        "command": "node \"{{REPO_ROOT_SLASH}}/tools/claude/hooks/skill-audit.mjs\"",
+        "timeout": 10,
+        "statusMessage": "Recording agent usage"
+      }
+    },
+    {
       "id": "skill-audit-post",
       "enabled": false,
       "event": "PostToolUse",

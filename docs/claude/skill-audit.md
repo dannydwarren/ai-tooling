@@ -9,12 +9,33 @@ quarter.
 
 ## How it works
 
-Two hooks, one script, one log file.
+Three hooks, one script, one log file.
 
 ```
-you type /wip                 ->  UserPromptExpansion  ->  skill-audit.mjs  ->  tmp/logs/skill-audit.jsonl
-model invokes a skill         ->  PreToolUse (Skill)   ->  skill-audit.mjs  ->  tmp/logs/skill-audit.jsonl
+you type /wip           ->  UserPromptExpansion  ->  skill-audit.mjs  ->  tmp/logs/skill-audit.jsonl
+model invokes a skill   ->  PreToolUse (Skill)   ->  skill-audit.mjs  ->  tmp/logs/skill-audit.jsonl
+a subagent is spawned   ->  SubagentStart        ->  skill-audit.mjs  ->  tmp/logs/skill-audit.jsonl
 ```
+
+## Three kinds, not one
+
+"Skill" was too narrow. The audit covers everything you can invoke:
+
+| Kind | Where it lives | How it is captured |
+|---|---|---|
+| `skill` | `skills/<name>/SKILL.md` | `PreToolUse` on the `Skill` tool, or a typed slash command |
+| `command` | `commands/<name>.md` | Same two paths — a command reaches the `Skill` tool too |
+| `agent` | `agents/<name>.md` | `SubagentStart` |
+
+**Skills and commands are indistinguishable at the moment of invocation.** Both arrive as a slash
+command or a `Skill` tool call; nothing in the payload says which is which. The difference is only
+where the definition lives on disk, so the hook records the name and the *analyzer* looks it up.
+That is why `/wip` was being reported as a skill when it is a command.
+
+**Agents are different and knowable up front.** `SubagentStart` is used rather than `PreToolUse` on
+the `Agent` tool, because it fires however the subagent was started and carries `agent_type`
+directly. `SubagentStop` fires too but is ignored when counting, so one agent run is one invocation
+rather than two.
 
 **Two hooks are required, and this is the easiest thing to get wrong.** A `PreToolUse` hook matched
 on the `Skill` tool captures only skills the model chooses to invoke. A slash command you type is
@@ -32,18 +53,24 @@ auto-triggering is a different kind of asset from one you deliberately reach for
 
 ```json
 {
-  "ts": "2026-09-10T04:36:18.025Z",
-  "event": "PreToolUse",
+  "ts": "2026-09-10T22:47:10.694Z",
+  "event": "SubagentStart",
+  "kind": "agent",
   "invocation": "model",
-  "tool": "Skill",
-  "skill": "superpowers:brainstorming",
-  "namespace": "superpowers",
-  "cwd": "/c/src/ai-tooling",
+  "tool": null,
+  "name": "general-purpose",
+  "namespace": null,
+  "cwd": "C:\src\ai-tooling",
   "project": "ai-tooling",
   "session_id": "abc123",
-  "args": "test run"
+  "args": null,
+  "agent_id": "a03543f3d4d71d1cd"
 }
 ```
+
+`kind` is set to `agent` at capture time and left null otherwise, because skill-versus-command is a
+lookup the analyzer does, not a fact the payload carries. Records written before this change used
+`skill` where this uses `name`; every reader accepts both, so old history still counts.
 
 `namespace` is the plugin prefix when there is one, derived syntactically from the name. `project`
 is the basename of the working directory. `args` is redacted and truncated to 160 characters; set
@@ -174,7 +201,21 @@ This lists **only skills that were actually invoked** — never the full catalog
 "what do I actually reach for", where the summary above is "what am I carrying". Times are local;
 the log itself stores UTC.
 
-Both accept `--log <path>` to read a different log and `--json` for machine-readable output.
+Filter to one kind with `--kind`:
+
+```bash
+npm run skills:used -- --kind agent
+npm run skills:used -- --kind command
+npm run skills:used -- --kind skill
+```
+
+Both commands accept `--log <path>` to read a different log and `--json` for machine-readable
+output.
+
+**Passing flags through npm needs `--`.** `npm run skills:inventory --used` does not work: npm
+treats `--used` as its own option and warns `Unknown cli config`, then runs the script with no
+arguments. Write `npm run skills:inventory -- --used`, or use the dedicated `npm run skills:used`,
+or call the script directly with `node scripts/claude-skill-inventory.mjs --used`.
 
 ## Design notes
 

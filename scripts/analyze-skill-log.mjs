@@ -71,15 +71,21 @@ export function classify(skill, { inRepo, inGlobal }) {
 }
 
 export function classifyRecord(record, context) {
+  if (record?.kind === 'agent') return { source: 'agent', owner: agentOwner(record) };
   if (record?.expansion_type === 'mcp_prompt') return { source: 'mcp-prompt', owner: 'mcp' };
-  return classify(record?.skill ?? null, context);
+  return classify(record?.name ?? record?.skill ?? null, context);
+}
+
+function agentOwner(record) {
+  const name = record?.name ?? record?.skill ?? '';
+  return name.includes(':') ? name.slice(0, name.indexOf(':')) : 'claude';
 }
 
 export function aggregate(records, context) {
   const bySkill = new Map();
   for (const record of records) {
-    if (record.event === 'PostToolUse') continue;
-    const skill = record.skill ?? '(unresolved)';
+    if (record.event === 'PostToolUse' || record.event === 'SubagentStop') continue;
+    const skill = record.name ?? record.skill ?? '(unresolved)';
     let stat = bySkill.get(skill);
     if (!stat) {
       stat = {

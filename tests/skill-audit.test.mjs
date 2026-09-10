@@ -58,7 +58,7 @@ test('builds a record with the fields the analyzer needs', () => {
     tool_input: { skill: 'engineering:utilities:ship', args: 'now' },
   }, '2026-09-09T00:00:00.000Z');
 
-  assert.equal(record.skill, 'engineering:utilities:ship');
+  assert.equal(record.name, 'engineering:utilities:ship');
   assert.equal(record.namespace, 'engineering');
   assert.equal(record.project, 'ai-tooling');
   assert.equal(record.session_id, 's1');
@@ -81,14 +81,14 @@ test('a typed slash command is recorded as a user invocation', () => {
     cwd: 'C:\\src\\ai-tooling',
   }, 'now');
 
-  assert.equal(record.skill, 'wip');
+  assert.equal(record.name, 'wip');
   assert.equal(record.invocation, 'user');
   assert.equal(record.args, 'today');
   assert.equal(record.project, 'ai-tooling');
 });
 
 test('a leading slash is stripped so typed and model names agree', () => {
-  assert.equal(buildRecord({ hook_event_name: 'UserPromptExpansion', command_name: '/wip' }, 'now').skill, 'wip');
+  assert.equal(buildRecord({ hook_event_name: 'UserPromptExpansion', command_name: '/wip' }, 'now').name, 'wip');
 });
 
 test('a model invoked skill is recorded as a model invocation', () => {
@@ -106,7 +106,7 @@ test('end to end: a typed slash command is logged', () => {
   runHook({ hook_event_name: 'UserPromptExpansion', command_name: 'wip', cwd: 'C:\\src\\repo' }, log);
   const records = readLog(log);
   assert.equal(records.length, 1);
-  assert.equal(records[0].skill, 'wip');
+  assert.equal(records[0].name, 'wip');
   assert.equal(records[0].invocation, 'user');
 });
 
@@ -128,7 +128,7 @@ test('args logging can be turned off', () => {
 
 test('an unrecognised input shape is preserved for diagnosis', () => {
   const record = buildRecord({ tool_name: 'Skill', tool_input: { mystery: 'value' } }, 'now');
-  assert.equal(record.skill, null);
+  assert.equal(record.name, null);
   assert.match(record.unresolved_input, /mystery/);
 });
 
@@ -139,8 +139,8 @@ test('end to end: appends one line per invocation and creates the directory', ()
 
   const records = readLog(log);
   assert.equal(records.length, 2);
-  assert.equal(records[0].skill, 'a:b');
-  assert.equal(records[1].skill, 'c');
+  assert.equal(records[0].name, 'a:b');
+  assert.equal(records[1].name, 'c');
 });
 
 test('end to end: always exits 0, even on garbage input', () => {
@@ -292,4 +292,62 @@ test('the real installed_plugins file on this machine parses to something', asyn
 
 test('a missing log file reads as empty rather than throwing', () => {
   assert.deepEqual(readLog(path.join(os.tmpdir(), 'definitely-not-here-12345.jsonl')), []);
+});
+
+test('a subagent spawn is recorded as an agent invocation', async () => {
+  const { buildRecord, isAgent } = await import('../tools/claude/hooks/skill-audit.mjs');
+  assert.ok(isAgent({ hook_event_name: 'SubagentStart' }));
+  assert.ok(isAgent({ hook_event_name: 'SubagentStop' }));
+  assert.ok(!isAgent({ hook_event_name: 'PreToolUse' }));
+
+  const record = buildRecord({
+    hook_event_name: 'SubagentStart',
+    agent_type: 'engineering:architect',
+    agent_id: 'abc123',
+    cwd: 'C:\src\repo',
+  }, 'now');
+
+  assert.equal(record.kind, 'agent');
+  assert.equal(record.name, 'engineering:architect');
+  assert.equal(record.namespace, 'engineering');
+  assert.equal(record.agent_id, 'abc123');
+  assert.equal(record.invocation, 'model', 'an agent is always spawned by the model, never typed');
+  assert.equal(record.args, null);
+});
+
+test('skills and commands carry no kind, since only the analyzer can tell them apart', async () => {
+  const { buildRecord } = await import('../tools/claude/hooks/skill-audit.mjs');
+  assert.equal(buildRecord({ hook_event_name: 'PreToolUse', tool_name: 'Skill', tool_input: { skill: 'a:b' } }, 'now').kind, null);
+  assert.equal(buildRecord({ hook_event_name: 'UserPromptExpansion', command_name: 'wip' }, 'now').kind, null);
+});
+
+test('end to end: a subagent spawn is logged', () => {
+  const log = tempLog();
+  runHook({ hook_event_name: 'SubagentStart', agent_type: 'Explore', agent_id: 'x1', cwd: 'C:\src\repo' }, log);
+  const records = readLog(log);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].name, 'Explore');
+  assert.equal(records[0].kind, 'agent');
+});
+
+test('SubagentStop is not counted, so an agent run is one invocation', async () => {
+  const { usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const map = usageBySkill([
+    { ts: '2026-09-10T10:00:00Z', event: 'SubagentStart', kind: 'agent', name: 'Explore' },
+    { ts: '2026-09-10T10:00:09Z', event: 'SubagentStop', kind: 'agent', name: 'Explore' },
+  ]);
+  assert.equal(map.get('Explore').count, 1);
+});
+
+test('readers accept the old skill field and the new name field', async () => {
+  const { usageBySkill, nameOf } = await import('../scripts/claude-skill-inventory.mjs');
+  assert.equal(nameOf({ skill: 'legacy' }), 'legacy');
+  assert.equal(nameOf({ name: 'current' }), 'current');
+  assert.equal(nameOf({}), null);
+
+  const map = usageBySkill([
+    { ts: '2026-09-08T10:00:00Z', skill: 'legacy-record' },
+    { ts: '2026-09-09T10:00:00Z', name: 'new-record' },
+  ]);
+  assert.equal(map.size, 2, 'records written before the rename must still be readable');
 });

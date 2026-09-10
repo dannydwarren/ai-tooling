@@ -29,6 +29,10 @@ export function isExpansion(payload) {
   return payload?.hook_event_name === 'UserPromptExpansion' || typeof payload?.command_name === 'string';
 }
 
+export function isAgent(payload) {
+  return payload?.hook_event_name === 'SubagentStart' || payload?.hook_event_name === 'SubagentStop';
+}
+
 export function namespaceOf(skill) {
   if (!skill || !skill.includes(':')) return null;
   return skill.slice(0, skill.indexOf(':'));
@@ -51,31 +55,37 @@ export function argsPreview(raw) {
 
 export function buildRecord(payload, now) {
   const expansion = isExpansion(payload);
+  const agent = isAgent(payload);
   const toolInput = payload?.tool_input || {};
-  const skill = expansion
-    ? (typeof payload.command_name === 'string' ? payload.command_name.trim().replace(/^\//, '') : null)
-    : extractSkill(toolInput);
+
+  let name = null;
+  if (agent) name = typeof payload.agent_type === 'string' ? payload.agent_type.trim() : null;
+  else if (expansion) name = typeof payload.command_name === 'string' ? payload.command_name.trim().replace(/^\//, '') : null;
+  else name = extractSkill(toolInput);
 
   const record = {
     ts: now,
     event: payload?.hook_event_name ?? null,
+    kind: agent ? 'agent' : null,
     invocation: expansion ? 'user' : 'model',
     tool: payload?.tool_name ?? null,
-    skill: capped(skill || null),
-    namespace: namespaceOf(skill),
+    name: capped(name || null),
+    namespace: namespaceOf(name),
     cwd: capped(payload?.cwd ?? null),
     project: capped(projectOf(payload?.cwd)),
     session_id: capped(payload?.session_id ?? null),
-    args: argsPreview(expansion ? payload.command_input : (toolInput.args ?? toolInput.arguments)),
+    args: agent ? null : argsPreview(expansion ? payload.command_input : (toolInput.args ?? toolInput.arguments)),
   };
+
+  if (agent) record.agent_id = capped(payload.agent_id ?? null);
 
   if (expansion) {
     record.expansion_type = payload.expansion_type ?? null;
     record.command_source = payload.command_source ?? null;
   }
 
-  if (!record.skill) {
-    const source = expansion ? payload : toolInput;
+  if (!record.name) {
+    const source = expansion || agent ? payload : toolInput;
     record.unresolved_input = redact(JSON.stringify(source)).slice(0, 400);
   }
   return record;
@@ -90,7 +100,7 @@ if (isMain(import.meta.url)) {
   runHook('skill-audit', async () => {
     const payload = await readPayload();
     if (payload?.tool_name && payload.tool_name !== 'Skill') return;
-    if (!isExpansion(payload) && !payload?.tool_name) return;
+    if (!isExpansion(payload) && !isAgent(payload) && !payload?.tool_name) return;
     append(logPath(), buildRecord(payload, new Date().toISOString()));
   });
 }

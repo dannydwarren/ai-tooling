@@ -40,10 +40,24 @@ export function skillsUnder(root, namespace) {
       if (fs.existsSync(skillFile)) {
         const fm = frontmatter(fs.readFileSync(skillFile, 'utf8'));
         const name = [namespace, ...parts, entry.name].filter(Boolean).join(':');
-        found.push({ name, description: fm.description ?? '', bytes: (fm.description ?? '').length });
+        found.push({ name, kind: 'skill', description: fm.description ?? '', bytes: (fm.description ?? '').length });
       }
       stack.push({ dir: next, parts: [...parts, entry.name] });
     }
+  }
+  return found;
+}
+
+export function agentsUnder(root, namespace) {
+  const dir = path.join(root, 'agents');
+  if (!fs.existsSync(dir)) return [];
+  const found = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+    const fm = frontmatter(fs.readFileSync(path.join(dir, entry.name), 'utf8'));
+    const bare = fm.name || entry.name.replace(/\.md$/, '');
+    const name = [namespace, bare].filter(Boolean).join(':');
+    found.push({ name, kind: 'agent', description: fm.description ?? '', bytes: (fm.description ?? '').length });
   }
   return found;
 }
@@ -62,7 +76,7 @@ export function commandsUnder(root, namespace) {
       } else if (entry.name.endsWith('.md')) {
         const fm = frontmatter(fs.readFileSync(next, 'utf8'));
         const name = [namespace, ...parts, entry.name.replace(/\.md$/, '')].filter(Boolean).join(':');
-        found.push({ name, description: fm.description ?? '', bytes: (fm.description ?? '').length });
+        found.push({ name, kind: 'command', description: fm.description ?? '', bytes: (fm.description ?? '').length });
       }
     }
   }
@@ -130,16 +144,20 @@ export function inventory() {
       kind: 'plugin',
       detail: `${source.marketplace} v${source.version}`,
       enabled: enabled ? enabled.has(source.plugin) : null,
-      skills: [...skillsUnder(source.root, source.plugin), ...commandsUnder(source.root, source.plugin)],
+      skills: [
+        ...skillsUnder(source.root, source.plugin),
+        ...commandsUnder(source.root, source.plugin),
+        ...agentsUnder(source.root, source.plugin),
+      ],
     });
   }
 
   const repoRoot = repoPath('tools', 'claude');
-  const mine = [...skillsUnder(repoRoot, null), ...commandsUnder(repoRoot, null)];
+  const mine = [...skillsUnder(repoRoot, null), ...commandsUnder(repoRoot, null), ...agentsUnder(repoRoot, null)];
   rows.push({ owner: 'ai-tooling', kind: 'personal-repo', detail: 'this repo', enabled: true, skills: mine });
 
   const tracked = new Set(mine.map((s) => s.name));
-  const global = [...skillsUnder(CLAUDE_HOME, null), ...commandsUnder(CLAUDE_HOME, null)];
+  const global = [...skillsUnder(CLAUDE_HOME, null), ...commandsUnder(CLAUDE_HOME, null), ...agentsUnder(CLAUDE_HOME, null)];
   rows.push({
     owner: 'unmanaged',
     kind: 'personal-global',
@@ -165,17 +183,22 @@ export function stamp(ts) {
   return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
 }
 
+export function nameOf(record) {
+  return record?.name ?? record?.skill ?? null;
+}
+
 export function usageBySkill(records) {
   const map = new Map();
   for (const record of records) {
-    if (record?.event === 'PostToolUse') continue;
-    const skill = record?.skill;
+    if (record?.event === 'PostToolUse' || record?.event === 'SubagentStop') continue;
+    const skill = nameOf(record);
     if (!skill) continue;
     let stat = map.get(skill);
     if (!stat) {
-      stat = { skill, count: 0, typed: 0, auto: 0, first: record.ts, last: record.ts };
+      stat = { skill, kind: record.kind ?? null, count: 0, typed: 0, auto: 0, first: record.ts, last: record.ts };
       map.set(skill, stat);
     }
+    if (!stat.kind && record.kind) stat.kind = record.kind;
     stat.count += 1;
     if (record.invocation === 'user') stat.typed += 1;
     else stat.auto += 1;
@@ -187,11 +210,27 @@ export function usageBySkill(records) {
   return map;
 }
 
+export const KINDS = ['skill', 'command', 'agent'];
+
+export function byKind(rows) {
+  const counts = Object.fromEntries(KINDS.map((k) => [k, 0]));
+  for (const row of rows) {
+    for (const entry of row.skills) {
+      if (counts[entry.kind] !== undefined) counts[entry.kind] += 1;
+    }
+  }
+  return counts;
+}
+
 export function coverage(rows, usage) {
   const available = new Map();
+  const kindOf = new Map();
   for (const row of rows) {
     if (row.enabled === false) continue;
-    for (const skill of row.skills) available.set(skill.name, row.owner);
+    for (const entry of row.skills) {
+      available.set(entry.name, row.owner);
+      kindOf.set(entry.name, entry.kind);
+    }
   }
 
   const used = [];
@@ -199,12 +238,20 @@ export function coverage(rows, usage) {
   const removed = [];
   for (const [name, stat] of usage) {
     if (available.has(name)) {
-      used.push({ ...stat, owner: available.get(name) });
+      used.push({ ...stat, owner: available.get(name), kind: kindOf.get(name) });
     } else if (name.includes(':')) {
-      removed.push({ ...stat, owner: `${name.slice(0, name.indexOf(':'))} (not installed)` });
+      removed.push({ ...stat, owner: `${name.slice(0, name.indexOf(':'))} (not installed)`, kind: stat.kind ?? 'unknown' });
     } else {
-      builtins.push({ ...stat, owner: BUILT_IN });
+      builtins.push({ ...stat, owner: BUILT_IN, kind: stat.kind ?? 'skill' });
     }
+  }
+
+  const perKind = Object.fromEntries(KINDS.map((k) => [k, { total: 0, used: 0 }]));
+  for (const kind of kindOf.values()) {
+    if (perKind[kind]) perKind[kind].total += 1;
+  }
+  for (const entry of used) {
+    if (perKind[entry.kind]) perKind[entry.kind].used += 1;
   }
 
   const all = [...used, ...builtins, ...removed]
@@ -215,6 +262,7 @@ export function coverage(rows, usage) {
   return {
     total: available.size,
     usedCount: used.length,
+    perKind,
     builtins,
     removed,
     skills: all,
@@ -267,33 +315,46 @@ function main() {
   }
 
   if (detail) {
-    console.log('Skills actually used');
+    console.log('Invocations recorded — skills, commands and agents');
     console.log(`  log: ${logFile}`);
     if (stats.skills.length === 0) {
       console.log('  nothing recorded yet.');
       return;
     }
     console.log('');
+    const only = args.includes('--kind') ? args[args.indexOf('--kind') + 1] : null;
+    const shown = only ? stats.skills.filter((s) => s.kind === only) : stats.skills;
+
+    if (shown.length === 0) {
+      console.log(`  nothing recorded${only ? ` for kind "${only}"` : ''}.`);
+      return;
+    }
+
     console.log(table(
-      stats.skills.map((s) => [s.count, s.typed, s.auto, s.skill, s.owner, stamp(s.first), stamp(s.last)]),
-      ['n', 'typed', 'auto', 'skill', 'owner', 'first used', 'last used'],
+      shown.map((s) => [s.count, s.typed, s.auto, s.kind ?? '?', s.skill, s.owner, stamp(s.first), stamp(s.last)]),
+      ['n', 'typed', 'auto', 'kind', 'name', 'owner', 'first used', 'last used'],
     ));
     console.log('');
-    console.log(`  ${stats.skills.length} distinct skill(s) used. Times are local.`);
+    console.log(`  ${shown.length} distinct invocation target(s). Times are local.`);
     return;
   }
 
   const invocable = rows.filter((r) => r.enabled !== false);
   const cached = rows.filter((r) => r.enabled === false);
 
-  console.log('Skill inventory — what can be invoked, and what it costs');
+  console.log('Invocation inventory — what can be invoked, and what it costs');
   console.log(`  cache: ${CACHE}`);
   console.log('');
+
+  const count = (row, kind) => row.skills.filter((s) => s.kind === kind).length;
 
   const totals = invocable
     .map((r) => [
       r.skills.length,
       `${usedIn(r, usage)}/${r.skills.length}`,
+      count(r, 'skill'),
+      count(r, 'command'),
+      count(r, 'agent'),
       `${Math.round(r.skills.reduce((n, s) => n + s.bytes, 0) / 1024 * 10) / 10}kb`,
       r.owner,
       r.detail,
@@ -303,27 +364,37 @@ function main() {
   totals.push([
     UNCOUNTABLE,
     `${stats.builtins.length}/${UNCOUNTABLE}`,
+    UNCOUNTABLE,
+    UNCOUNTABLE,
+    UNCOUNTABLE,
     '-',
     BUILT_IN,
     'ships with Claude, not enumerable on disk',
   ]);
 
-  console.log(table(totals, ['entries', 'used', 'desc', 'owner', 'source']));
+  console.log(table(totals, ['entries', 'used', 'skills', 'cmds', 'agents', 'desc', 'owner', 'source']));
 
   const liveCount = invocable.reduce((n, r) => n + r.skills.length, 0);
   const liveBytes = invocable.reduce((n, r) => n + r.skills.reduce((m, s) => m + s.bytes, 0), 0);
   const percent = stats.total === 0 ? 0 : Math.round((stats.usedCount / stats.total) * 100);
 
   console.log('');
-  console.log(`  ${liveCount} installed skills and commands, ~${Math.round(liveBytes / 1024)}kb of descriptions, loaded every session.`);
+  console.log(`  ${liveCount} installed entries, ~${Math.round(liveBytes / 1024)}kb of descriptions, loaded every session.`);
   if (liveCount !== stats.total) {
     console.log(`  ${stats.total} distinct names: some plugins ship a skill and a same-named command, and both load.`);
   }
 
   console.log('');
-  console.log(`  used:  ${stats.usedCount} of ${stats.total} installed (${percent}%), plus ${stats.builtins.length} ${BUILT_IN}`);
-  console.log(`  first: ${stamp(stats.first)}`);
-  console.log(`  last:  ${stamp(stats.last)}`);
+  for (const kind of KINDS) {
+    const k = stats.perKind[kind];
+    const pct = k.total === 0 ? 0 : Math.round((k.used / k.total) * 100);
+    console.log(`  ${`${kind}s`.padEnd(9)} ${k.used} of ${k.total} used (${pct}%)`);
+  }
+  console.log(`  ${'built-in'.padEnd(9)} ${stats.builtins.length} used, out of a total this tool cannot know`);
+  console.log('');
+  console.log(`  overall:  ${stats.usedCount} of ${stats.total} installed (${percent}%)`);
+  console.log(`  first:    ${stamp(stats.first)}`);
+  console.log(`  last:     ${stamp(stats.last)}`);
 
   if (stats.removed.length > 0) {
     console.log(`  ${stats.removed.length} used skill(s) belong to a plugin that is no longer installed.`);

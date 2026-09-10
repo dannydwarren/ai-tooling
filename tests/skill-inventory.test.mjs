@@ -217,3 +217,56 @@ test('usedIn counts only the owner rows own skills', async () => {
   assert.equal(usedIn({ skills: [{ name: 'p:one' }, { name: 'p:two' }] }, usage), 1);
   assert.equal(usedIn({ skills: [{ name: 'q:one' }] }, usage), 0);
 });
+
+test('agents are enumerated from an agents directory', async () => {
+  const { agentsUnder } = await import('../scripts/claude-skill-inventory.mjs');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agents-'));
+  fs.mkdirSync(path.join(root, 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'agents', 'architect.md'), '---\nname: architect\ndescription: designs things\n---\n');
+  fs.writeFileSync(path.join(root, 'agents', 'notes.txt'), 'ignored');
+
+  const found = agentsUnder(root, 'plug');
+  assert.deepEqual(found.map((a) => a.name), ['plug:architect']);
+  assert.equal(found[0].kind, 'agent');
+  assert.equal(found[0].description, 'designs things');
+});
+
+test('every inventory entry declares which kind it is', async () => {
+  const { inventory, KINDS } = await import('../scripts/claude-skill-inventory.mjs');
+  for (const row of inventory()) {
+    for (const entry of row.skills) {
+      assert.ok(KINDS.includes(entry.kind), `${entry.name} has kind ${entry.kind}`);
+    }
+  }
+});
+
+test('coverage is broken down per kind', async () => {
+  const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const rows = [{
+    owner: 'p',
+    enabled: true,
+    skills: [
+      { name: 'p:s1', kind: 'skill' },
+      { name: 'p:s2', kind: 'skill' },
+      { name: 'p:c1', kind: 'command' },
+      { name: 'p:a1', kind: 'agent' },
+    ],
+  }];
+  const stats = coverage(rows, usageBySkill([
+    { ts: '2026-09-10T10:00:00Z', name: 'p:s1' },
+    { ts: '2026-09-10T10:00:00Z', name: 'p:a1', kind: 'agent' },
+  ]));
+
+  assert.deepEqual(stats.perKind.skill, { total: 2, used: 1 });
+  assert.deepEqual(stats.perKind.command, { total: 1, used: 0 });
+  assert.deepEqual(stats.perKind.agent, { total: 1, used: 1 });
+});
+
+test('a used name is classified by where it lives, not by how it was invoked', async () => {
+  const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const rows = [{ owner: 'p', enabled: true, skills: [{ name: 'p:thing', kind: 'command' }] }];
+  const stats = coverage(rows, usageBySkill([{ ts: '2026-09-10T10:00:00Z', name: 'p:thing' }]));
+  assert.equal(stats.skills[0].kind, 'command', 'a slash command is a command even though it reaches the Skill tool');
+});
