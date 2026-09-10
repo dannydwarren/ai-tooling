@@ -80,7 +80,10 @@ Which hooks get installed is controlled by the `enabled` flag in
 It **merges** rather than overwrites. It only ever touches hook entries whose command references
 `tools/claude/hooks/`; anything else in `settings.json` — your plugins, permissions, env, your own
 hooks — is left exactly as it was. It writes a timestamped backup next to the file before changing
-it, and running it twice produces the same result as running it once.
+it, keeping the five most recent, and running it twice produces the same result as running it once.
+
+It compares hooks structurally rather than textually, so a settings file that something else has
+reordered is recognised as unchanged instead of being rewritten on every run.
 
 It does **not** restore `tools/claude/settings/settings.json` over your live settings. That file is
 a backup for rebuilding a machine, not an input to the installer. To use it, render the

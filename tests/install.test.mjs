@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import path from 'node:path';
 import { isManagedCommand, stripManaged, addManaged, catalogEntries, canonical } from '../scripts/claude-install.mjs';
 import { render, unrender, placeholdersIn, derivedValues, jsonEscaped, requiredValueKeys, loadPrivateValues } from '../scripts/lib/template.mjs';
 import { toPosix, toSlash } from '../scripts/lib/paths.mjs';
@@ -232,4 +233,29 @@ test('derived values expose every form the templates use', () => {
     'CLAUDE_HOME', 'CLAUDE_HOME_SLASH', 'CLAUDE_HOME_POSIX', 'CLAUDE_HOME_JSON']) {
     assert.ok(typeof values[key] === 'string' && values[key].length > 0, `${key} missing`);
   }
+});
+
+test('backups are timestamped and pruned to the newest few', async () => {
+  const { backup, backupsOf } = await import('../scripts/lib/fsx.mjs');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-'));
+  const file = path.join(dir, 'settings.json');
+  fs.writeFileSync(file, '{}', 'utf8');
+
+  for (let i = 0; i < 8; i += 1) {
+    fs.writeFileSync(path.join(dir, `settings.json.ai-tooling-backup.2026-09-0${i + 1}`), '{}', 'utf8');
+  }
+  const made = backup(file, 5);
+
+  assert.ok(made.includes('.ai-tooling-backup.'));
+  const remaining = backupsOf(file);
+  assert.equal(remaining.length, 5, 'only the newest few backups should survive');
+  assert.ok(remaining.includes(made), 'the backup just taken must be kept');
+});
+
+test('backing up a file that does not exist is a no-op', async () => {
+  const { backup } = await import('../scripts/lib/fsx.mjs');
+  const os = await import('node:os');
+  assert.equal(backup(path.join(os.tmpdir(), 'not-here-98765.json')), null);
 });
