@@ -1,0 +1,9 @@
+{
+  "name": "ai-tooling",
+  "description": "Danny's personal Claude Code hooks, skills and commands, served directly from the ai-tooling repo.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Danny Warren"
+  },
+  "homepage": "https://github.com/dannydwarren/ai-tooling"
+}

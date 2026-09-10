@@ -1,0 +1,25 @@
+{
+  "name": "ai-tooling",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Danny's personal AI tooling, skills and configuration, with the scripts that install them and keep secrets out.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:strict": "node scripts/build.mjs --strict",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "scan": "node scripts/checks/scan.mjs",
+    "scan:strict": "node scripts/checks/scan.mjs --strict",
+    "claude:install": "node scripts/claude-install.mjs",
+    "claude:check": "node scripts/claude-install.mjs --check",
+    "claude:uninstall": "node scripts/claude-install.mjs --uninstall",
+    "claude:capture": "node scripts/claude-capture.mjs",
+    "claude:capture:check": "node scripts/claude-capture.mjs --check",
+    "skills:report": "node scripts/analyze-skill-log.mjs",
+    "claude:plugin-hooks": "node scripts/claude-plugin-hooks.mjs"
+  }
+}

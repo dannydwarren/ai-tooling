@@ -1,0 +1,47 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ENABLE_LSP_TOOL": "1"
+  },
+  "attribution": {
+    "commit": ""
+  },
+  "permissions": {
+    "defaultMode": "auto",
+    "additionalDirectories": [
+      "{{USER_HOME_JSON}}\\.jobnimbus"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '## Current WIP (work-tracking/wip.md)' && cat {{USER_HOME_POSIX}}/work-tracking/wip.md"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "linear@claude-plugins-official": true,
+    "csharp-lsp@claude-plugins-official": true,
+    "engineering-standards@jobnimbus": true,
+    "engineering@jobnimbus": true,
+    "platform-api-creation@jobnimbus": true,
+    "jnlocal@jobnimbus": true
+  },
+  "extraKnownMarketplaces": {
+    "jobnimbus": {
+      "source": {
+        "source": "file",
+        "path": "C:\\src\\{{WORK_MARKETPLACE_REPO}}\\.claude-plugin\\marketplace.json"
+      }
+    }
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "teammateMode": "auto",
+  "skipAutoPermissionPrompt": true
+}

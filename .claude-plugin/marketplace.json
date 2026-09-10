@@ -1,0 +1,17 @@
+{
+  "name": "ai-tooling",
+  "owner": {
+    "name": "Danny Warren"
+  },
+  "metadata": {
+    "description": "Personal AI tooling marketplace. Serves the ai-tooling repo's Claude assets as an installable plugin.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "ai-tooling",
+      "source": "./tools/claude",
+      "description": "Personal Claude Code hooks, skills and commands served live from the ai-tooling checkout."
+    }
+  ]
+}

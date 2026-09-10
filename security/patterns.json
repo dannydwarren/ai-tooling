@@ -1,0 +1,126 @@
+{
+  "note": "Detection patterns for scripts/checks/scan.mjs. Every pattern here is generic and safe to publish. Values that are themselves sensitive (internal hostnames, cluster names, private repo paths) must NOT be added here; put them in the private values file instead and the private-value rule will catch them. See docs/security.md.",
+  "flags": "g",
+  "rules": [
+    {
+      "id": "private-key",
+      "severity": "secret",
+      "title": "Private key block",
+      "pattern": "-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----"
+    },
+    {
+      "id": "jwt",
+      "severity": "secret",
+      "title": "JSON Web Token",
+      "pattern": "\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}"
+    },
+    {
+      "id": "aws-access-key-id",
+      "severity": "secret",
+      "title": "AWS access key id",
+      "pattern": "\\b(?:AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16}\\b"
+    },
+    {
+      "id": "aws-secret-access-key",
+      "severity": "secret",
+      "title": "AWS secret access key",
+      "pattern": "(?i)aws_?secret_?access_?key[\"']?\\s*[:=]\\s*[\"']?[A-Za-z0-9/+=]{40}"
+    },
+    {
+      "id": "github-token",
+      "severity": "secret",
+      "title": "GitHub token",
+      "pattern": "\\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\\b|\\bgithub_pat_[A-Za-z0-9_]{20,}\\b"
+    },
+    {
+      "id": "slack-token",
+      "severity": "secret",
+      "title": "Slack token",
+      "pattern": "\\bxox[abprs]-[A-Za-z0-9-]{10,}\\b"
+    },
+    {
+      "id": "llm-api-key",
+      "severity": "secret",
+      "title": "Anthropic/OpenAI style API key",
+      "pattern": "\\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}\\b"
+    },
+    {
+      "id": "google-api-key",
+      "severity": "secret",
+      "title": "Google API key",
+      "pattern": "\\bAIza[0-9A-Za-z_-]{35}\\b"
+    },
+    {
+      "id": "npm-token",
+      "severity": "secret",
+      "title": "npm access token",
+      "pattern": "\\bnpm_[A-Za-z0-9]{30,}\\b"
+    },
+    {
+      "id": "bearer-token",
+      "severity": "secret",
+      "title": "Bearer token",
+      "pattern": "(?i)bearer\\s+[A-Za-z0-9._~+/=-]{20,}"
+    },
+    {
+      "id": "authorization-header",
+      "severity": "secret",
+      "title": "Authorization header with a literal value",
+      "pattern": "(?i)[\"']?authorization[\"']?\\s*[:=]\\s*[\"'][^\"']{16,}[\"']"
+    },
+    {
+      "id": "assigned-credential",
+      "severity": "secret",
+      "title": "Credential assigned to a variable or key",
+      "pattern": "(?i)\\b(?:password|passwd|pwd|secret|client_secret|access_token|refresh_token|api[_-]?key|apikey|auth[_-]?token)[\"']?\\s*[:=]\\s*[\"'][^\"'\\s${}<>]{8,}[\"']"
+    },
+    {
+      "id": "connection-string",
+      "severity": "secret",
+      "title": "Connection string with inline credentials",
+      "pattern": "(?i)\\b(?:mongodb(?:\\+srv)?|postgres(?:ql)?|mysql|redis|amqp|ftp)://[^\\s\"'/]+:[^\\s\"'@]+@"
+    },
+    {
+      "id": "otel-headers",
+      "severity": "secret",
+      "title": "OTLP exporter headers (these carry ingest tokens)",
+      "pattern": "OTEL_EXPORTER_OTLP_HEADERS[\"']?\\s*[:=]\\s*[\"'][^\"']+[\"']"
+    },
+    {
+      "id": "claude-credentials-file",
+      "severity": "secret",
+      "title": "Content copied from a Claude credentials or state file",
+      "pattern": "\"(?:accessToken|refreshToken|oauthAccount|accountUuid|organizationUuid)\"\\s*:"
+    },
+    {
+      "id": "email-address",
+      "severity": "pii",
+      "title": "Email address",
+      "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+\\b"
+    },
+    {
+      "id": "phone-number",
+      "severity": "pii",
+      "title": "Phone number",
+      "pattern": "(?:\\+?1[-. ])?\\(\\d{3}\\)\\s*\\d{3}[-. ]\\d{4}\\b|(?:\\+?1[-. ])?\\b\\d{3}[-.]\\d{3}[-.]\\d{4}\\b"
+    },
+    {
+      "id": "windows-user-path",
+      "severity": "pii",
+      "title": "Absolute Windows user-profile path (discloses the account name)",
+      "pattern": "[A-Za-z]:[\\\\/]{1,2}Users[\\\\/]{1,2}[A-Za-z0-9._-]+"
+    },
+    {
+      "id": "posix-user-path",
+      "severity": "pii",
+      "title": "Absolute POSIX home path (discloses the account name)",
+      "pattern": "/(?:[a-z]/Users|home|Users)/[A-Za-z0-9._-]+"
+    },
+    {
+      "id": "uuid",
+      "severity": "pii",
+      "title": "UUID (may be an account, org or workspace identifier)",
+      "pattern": "\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\b"
+    }
+  ]
+}

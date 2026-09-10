@@ -1,0 +1,40 @@
+{
+  "note": "Accepted findings from scripts/checks/scan.mjs. Every entry needs a written reason. An entry matches when all of its present fields match a finding: `file` (glob, repo-relative, forward slashes), `rule` (rule id from security/patterns.json), `fingerprint` (from the scan report). Prefer the narrowest entry that works. Allowlisting a `secret`-severity rule should be rare and is a deliberate decision. See docs/security.md.",
+  "entries": [
+    {
+      "file": "docs/claude/hooks.md",
+      "rule": "posix-user-path",
+      "reason": "Hook documentation quotes example command strings from the official Claude Code docs, which use generic /home/user paths."
+    },
+    {
+      "file": "docs/claude/hooks.md",
+      "rule": "uuid",
+      "reason": "The documented shape of a hook stdin payload includes a sample session id. It is the placeholder UUID used by the official docs, not a real identifier."
+    },
+    {
+      "file": "docs/claude/plugins.md",
+      "rule": "email-address",
+      "reason": "Example marketplace owner metadata using an example.com address, quoted to show the manifest shape."
+    },
+    {
+      "file": "docs/decisions/*",
+      "rule": "windows-user-path",
+      "reason": "The decision records illustrate the path templating problem with invented example paths such as C:\\Users\\Name. They describe the mechanism rather than disclosing a real account."
+    },
+    {
+      "file": "docs/decisions/*",
+      "rule": "posix-user-path",
+      "reason": "As above: generic POSIX home paths used as illustrations in the decision records."
+    },
+    {
+      "file": "tests/*.test.mjs",
+      "rule": "windows-user-path",
+      "reason": "Invented paths such as C:\\Users\\Someone are test inputs for the path templating logic. Asserting on them is the point of the test."
+    },
+    {
+      "file": "tests/*.test.mjs",
+      "rule": "posix-user-path",
+      "reason": "As above: synthetic POSIX paths used as templating test inputs."
+    }
+  ]
+}

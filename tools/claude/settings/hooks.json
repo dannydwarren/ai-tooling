@@ -1,0 +1,57 @@
+{
+  "managedBy": "ai-tooling",
+  "note": "Catalog of hooks this repo installs into ~/.claude/settings.json. Placeholders are rendered at install time by scripts/claude-install.mjs. See docs/claude/hooks-catalog.md.",
+  "hooks": [
+    {
+      "id": "skill-audit",
+      "enabled": true,
+      "event": "PreToolUse",
+      "matcher": "Skill",
+      "description": "Append one JSONL record per Skill invocation to tmp/logs/skill-audit.jsonl. Passive: never blocks, always exits 0.",
+      "hook": {
+        "type": "command",
+        "command": "node \"{{REPO_ROOT_SLASH}}/tools/claude/hooks/skill-audit.mjs\"",
+        "timeout": 10,
+        "statusMessage": "Recording skill usage"
+      }
+    },
+    {
+      "id": "skill-audit-typed",
+      "enabled": true,
+      "event": "UserPromptExpansion",
+      "description": "Companion to skill-audit. A slash command typed by the user expands before the model sees it, so it never reaches the Skill tool and PreToolUse never fires. This catches those, recorded with invocation=user.",
+      "hook": {
+        "type": "command",
+        "command": "node \"{{REPO_ROOT_SLASH}}/tools/claude/hooks/skill-audit.mjs\"",
+        "timeout": 10,
+        "statusMessage": "Recording skill usage"
+      }
+    },
+    {
+      "id": "skill-audit-post",
+      "enabled": false,
+      "event": "PostToolUse",
+      "matcher": "Skill",
+      "description": "Optional companion to skill-audit. Records skill completion so the analyzer can pair start/finish. Doubles log volume; off by default.",
+      "hook": {
+        "type": "command",
+        "command": "node \"{{REPO_ROOT_SLASH}}/tools/claude/hooks/skill-audit.mjs\"",
+        "timeout": 10,
+        "statusMessage": "Recording skill completion"
+      }
+    },
+    {
+      "id": "no-comments",
+      "enabled": false,
+      "event": "PostToolUse",
+      "matcher": "Edit|Write",
+      "description": "Reject code comments introduced by Edit/Write in known code file types, per the CLAUDE.md no-comments rule. Exits 2 so the message is fed back to Claude. Off by default until the false-positive rate is trusted.",
+      "hook": {
+        "type": "command",
+        "command": "node \"{{REPO_ROOT_SLASH}}/tools/claude/hooks/no-comments.mjs\"",
+        "timeout": 10,
+        "statusMessage": "Checking for code comments"
+      }
+    }
+  ]
+}

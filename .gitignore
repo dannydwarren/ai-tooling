@@ -429,8 +429,22 @@ FodyWeavers.xsd
 *.msp
 
 # AI
-tmp/
+tmp/*
+!tmp/.gitkeep
+!tmp/README.md
 .claude/settings.local.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 .worktrees
+
+# ai-tooling: never commit captured machine state or credentials
+**/.credentials.json
+**/*.credentials.json
+**/settings.local.json
+backups/
+*.pem
+*.key
+*.pfx
+*.p12
+.secrets/
+node_modules/

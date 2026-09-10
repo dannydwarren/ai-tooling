@@ -1,0 +1,9 @@
+{
+  "note": "Declares the private placeholder keys this repo expects, WITHOUT their values. The values live in ~/.ai-tooling/values.json, outside the working tree. Descriptions here must not reveal the value they describe. The build uses this list to recognise a placeholder as legitimate even on a machine (or a CI runner) that has no values file. See docs/security.md.",
+  "values": {
+    "MSK_CLUSTER_NAME": "Name of the Kafka/MSK cluster referenced by example queries in the checking-kafka-offset-lag skill.",
+    "WORK_MARKETPLACE_REPO": "Repository name of the employer's internal Claude plugin marketplace, referenced in the settings backup.",
+    "SNOWFLAKE_ACCOUNT": "Snowflake account identifier passed to the snowflake MCP server in the MCP backup.",
+    "USER_EMAIL": "Work email address used as the Snowflake login in the MCP backup."
+  }
+}

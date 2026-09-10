@@ -1,0 +1,11 @@
+This file must produce zero findings. It contains near-misses that the scanner
+should NOT flag, so that false positives get caught by the suite too.
+
+A url with a double slash: https://example.com/docs//index.html
+A comment marker inside a string: const s = "https://foo"
+The word password appears as prose, not as an assignment.
+An env-var reference rather than a literal: api_key = "${MY_API_KEY}"
+A templated value: token = "{{SOME_PLACEHOLDER}}"
+A relative path: ./tools/claude/hooks/no-comments.mjs
+A short hex string: deadbeef
+Version numbers: 1.2.3 and 2026.09.09

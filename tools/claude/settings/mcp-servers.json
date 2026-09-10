@@ -1,0 +1,29 @@
+{
+  "note": "Backup of the mcpServers block from ~/.claude.json, captured by scripts/claude-capture.mjs. This is NOT installed automatically: ~/.claude.json is large and stateful, so restore it by hand or with `claude mcp add`. Placeholders are rendered from ~/.ai-tooling/values.json. Servers whose config contained an inline credential are omitted, not redacted.",
+  "mcpServers": {
+    "datadog": {
+      "type": "http",
+      "url": "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp"
+    },
+    "snowflake": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "snowflake-labs-mcp",
+        "--account",
+        "{{SNOWFLAKE_ACCOUNT}}",
+        "--user",
+        "{{USER_EMAIL}}",
+        "--private-key-file",
+        "{{USER_HOME_JSON}}\\.snowflake\\rsa_key.p8",
+        "--warehouse",
+        "GENERAL_WH",
+        "--database",
+        "STAGING",
+        "--schema",
+        "CORE"
+      ],
+      "env": {}
+    }
+  }
+}
