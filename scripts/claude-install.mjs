@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { CLAUDE_HOME, REPO_ROOT, VALUES_FILE, repoPath, isMain } from './lib/paths.mjs';
-import { loadValues, render, placeholdersIn, requiredValueKeys } from './lib/template.mjs';
+import { CLAUDE_HOME, REPO_ROOT, VALUES_FILE, repoPath, isMain, toSlash } from './lib/paths.mjs';
+import { loadValues, render, renderDeep, placeholdersIn, requiredValueKeys } from './lib/template.mjs';
 import { relFiles, readText, writeText, readJson, writeJson, backup, sameText } from './lib/fsx.mjs';
 
 const SOURCE = repoPath('tools', 'claude');
-const HOOKS_DIR_MARKER = 'tools/claude/hooks/';
+const HOOKS_DIR = toSlash(path.join(SOURCE, 'hooks')).toLowerCase();
 
 const CONTENT = [
   { from: 'CLAUDE.md', to: 'CLAUDE.md', kind: 'file' },
@@ -44,19 +44,35 @@ export function catalogEntries() {
   return catalog.hooks ?? [];
 }
 
-export function isManagedCommand(command) {
-  return typeof command === 'string' && command.replace(/\\/g, '/').includes(HOOKS_DIR_MARKER);
+export function isManagedCommand(command, hooksDir = HOOKS_DIR) {
+  if (typeof command !== 'string') return false;
+  return toSlash(command).toLowerCase().includes(`${hooksDir}/`);
 }
 
-export function stripManaged(hooks) {
+export function stripManaged(hooks, hooksDir = HOOKS_DIR) {
   const out = {};
   for (const [event, groups] of Object.entries(hooks ?? {})) {
-    const kept = [];
-    for (const group of groups ?? []) {
-      const inner = (group.hooks ?? []).filter((h) => !isManagedCommand(h.command));
-      if (inner.length > 0) kept.push({ ...group, hooks: inner });
+    if (!Array.isArray(groups)) {
+      out[event] = groups;
+      continue;
     }
-    if (kept.length > 0) out[event] = kept;
+
+    const kept = [];
+    for (const group of groups) {
+      const inner = group?.hooks;
+      if (!Array.isArray(inner)) {
+        kept.push(group);
+        continue;
+      }
+      if (!inner.some((h) => isManagedCommand(h?.command, hooksDir))) {
+        kept.push(group);
+        continue;
+      }
+      const remaining = inner.filter((h) => !isManagedCommand(h?.command, hooksDir));
+      if (remaining.length > 0) kept.push({ ...group, hooks: remaining });
+    }
+
+    if (kept.length > 0 || groups.length === 0) out[event] = kept;
   }
   return out;
 }
@@ -75,11 +91,11 @@ export function addManaged(hooks, entries, values) {
   const applied = [];
   for (const entry of entries) {
     if (!entry.enabled) continue;
-    const rendered = render(JSON.stringify(entry.hook), values);
+    const rendered = renderDeep(entry.hook, values);
     if (rendered.missing.length > 0) {
       throw new Error(`Hook "${entry.id}" has unresolved placeholders: ${rendered.missing.join(', ')}`);
     }
-    const hook = JSON.parse(rendered.text);
+    const hook = rendered.value;
     out[entry.event] ??= [];
     const matcher = entry.matcher;
     let group = out[entry.event].find((g) => (g.matcher ?? null) === (matcher ?? null));
@@ -101,6 +117,17 @@ function main() {
 
   const problems = [];
   const changes = [];
+
+  let settings;
+  try {
+    settings = readJson(settingsFile, {});
+  } catch (err) {
+    console.error(`ai-tooling claude ${args.check ? 'check' : 'install'}`);
+    console.error(`  ! ${err.message}`);
+    console.error('  Nothing was written. Fix or move that file and run again.');
+    console.error('  A UTF-8 BOM is handled automatically; a trailing comma or truncated write is not.');
+    process.exit(1);
+  }
 
   const missingValues = new Set();
   const planned = plannedContent(values);
@@ -126,7 +153,6 @@ function main() {
     }
   }
 
-  const settings = readJson(settingsFile, {});
   const before = canonical(settings.hooks ?? {});
   const stripped = stripManaged(settings.hooks);
   let nextHooks = stripped;

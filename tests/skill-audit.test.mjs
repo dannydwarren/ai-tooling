@@ -244,6 +244,52 @@ test('rolls up by source and finds plugins with no recorded use', () => {
   assert.deepEqual(unusedPlugins(stats, ['engineering', 'product', 'qa']), ['product', 'qa']);
 });
 
+test('installed plugins are parsed from the real file shape', async () => {
+  const { parseInstalledPlugins, pluginNameOf } = await import('../scripts/analyze-skill-log.mjs');
+
+  assert.equal(pluginNameOf('engineering@jobnimbus'), 'engineering');
+  assert.equal(pluginNameOf('csharp-lsp@claude-plugins-official'), 'csharp-lsp');
+  assert.equal(pluginNameOf('bare'), 'bare');
+
+  const real = {
+    version: 2,
+    plugins: {
+      'superpowers@claude-plugins-official': [{ version: '6.3.0', scope: 'user' }],
+      'engineering@jobnimbus': [{ version: '3.4.1', scope: 'user' }],
+    },
+  };
+  assert.deepEqual(parseInstalledPlugins(real), ['engineering', 'superpowers']);
+});
+
+test('plugin names align with the owner field the report groups by', async () => {
+  const { parseInstalledPlugins, aggregate, unusedPlugins } = await import('../scripts/analyze-skill-log.mjs');
+  const installed = parseInstalledPlugins({
+    plugins: { 'engineering@jobnimbus': [{}], 'linear@claude-plugins-official': [{}] },
+  });
+  const stats = aggregate(
+    [{ ts: '2026-09-10T00:00:00Z', event: 'PreToolUse', skill: 'engineering:utilities:ship' }],
+    { inRepo: new Set(), inGlobal: new Set() },
+  );
+  assert.deepEqual(unusedPlugins(stats, installed), ['linear'], 'a used plugin must not be reported unused');
+});
+
+test('a malformed or unexpected installed_plugins shape yields nothing rather than throwing', async () => {
+  const { parseInstalledPlugins } = await import('../scripts/analyze-skill-log.mjs');
+  assert.deepEqual(parseInstalledPlugins(null), []);
+  assert.deepEqual(parseInstalledPlugins({}), []);
+  assert.deepEqual(parseInstalledPlugins({ plugins: null }), []);
+  assert.deepEqual(parseInstalledPlugins({ plugins: [] }), []);
+});
+
+test('the real installed_plugins file on this machine parses to something', async () => {
+  const { installedPlugins } = await import('../scripts/analyze-skill-log.mjs');
+  const found = installedPlugins();
+  assert.ok(Array.isArray(found));
+  if (found.length > 0) {
+    assert.ok(found.every((n) => !n.includes('@')), 'names must be bare so they match the owner field');
+  }
+});
+
 test('a missing log file reads as empty rather than throwing', () => {
   assert.deepEqual(readLog(path.join(os.tmpdir(), 'definitely-not-here-12345.jsonl')), []);
 });

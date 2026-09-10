@@ -15,7 +15,11 @@ export const SAMPLES = [
   { rule: 'authorization-header', text: j('"authorization"', ': "', 'Basic ', 'h'.repeat(24), '"') },
   { rule: 'assigned-credential', text: j('password', ' = "', 'hunter2hunter2', '"') },
   { rule: 'assigned-credential', text: j('client_secret', ': "', 'not-a-real-value', '"') },
+  { rule: 'assigned-credential', text: j('PG', 'PASSWORD', '=', 'supersecret123') },
   { rule: 'connection-string', text: j('postgres', 'ql://', 'appuser', ':', 'placeholder', '@', 'db.example:5432/appdb') },
+  { rule: 'stripe-key', text: j('s', 'k', '_', 'live', '_', 'A'.repeat(24)) },
+  { rule: 'slack-webhook', text: j('https://hooks', '.slack.com', '/services/', 'T00000000/B00000000/', 'X'.repeat(24)) },
+  { rule: 'azure-storage-key', text: j('AccountKey', '=', 'B'.repeat(44), ';') },
   { rule: 'otel-headers', text: j('OTEL_EXPORTER_OTLP_HEADERS', '="', 'Authorization=Redacted', '"') },
   { rule: 'claude-credentials-file', text: j('"', 'accessToken', '": "value"') },
   { rule: 'email-address', text: j('someone', '@', 'example.com') },
@@ -24,6 +28,9 @@ export const SAMPLES = [
   { rule: 'windows-user-path', text: j('C:', '\\Users\\', 'SomePerson', '\\Documents') },
   { rule: 'posix-user-path', text: j('/', 'home', '/', 'someperson', '/projects') },
   { rule: 'uuid', text: j('123e4567', '-', 'e89b', '-', '12d3', '-', 'a456', '-', '426614174000') },
+  { rule: 'ssn', text: j('123', '-', '45', '-', '6789') },
+  { rule: 'credit-card', text: j('4111', ' ', '1111', ' ', '1111', ' ', '1111') },
+  { rule: 'ip-address', text: j('203', '.', '0', '.', '113', '.', '42') },
 ];
 
 export const CORPUS = SAMPLES.map((s) => s.text).join('\n');

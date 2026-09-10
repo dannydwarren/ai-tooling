@@ -51,7 +51,7 @@ Use `mcp__datadog__get_datadog_metric`. Scalar for "what is it right now"; times
     "filters": [
       "env:prod",
       "cluster_name:{{MSK_CLUSTER_NAME}}",
-      "consumer_group:record-authorizer-sync-jndata-cb-main-email"
+      "consumer_group:{{MSK_EXAMPLE_CONSUMER_GROUP}}"
     ]
   }],
   "from": "now-15m",

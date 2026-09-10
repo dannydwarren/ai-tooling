@@ -41,26 +41,24 @@ export function globalSkills() {
   ]);
 }
 
+export function pluginNameOf(key) {
+  const at = String(key).lastIndexOf('@');
+  return at > 0 ? key.slice(0, at) : String(key);
+}
+
+export function parseInstalledPlugins(data) {
+  const plugins = data?.plugins;
+  if (!plugins || typeof plugins !== 'object') return [];
+  return [...new Set(Object.keys(plugins).map(pluginNameOf))].sort();
+}
+
 export function installedPlugins() {
   const file = path.join(CLAUDE_HOME, 'plugins', 'installed_plugins.json');
   if (!fs.existsSync(file)) return [];
   try {
-    const data = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const names = new Set();
-    collectPluginNames(data, names);
-    return [...names];
+    return parseInstalledPlugins(JSON.parse(fs.readFileSync(file, 'utf8')));
   } catch {
     return [];
-  }
-}
-
-function collectPluginNames(node, out, depth = 0) {
-  if (!node || typeof node !== 'object' || depth > 4) return;
-  for (const [key, value] of Object.entries(node)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      if ('version' in value || 'source' in value || 'marketplace' in value) out.add(key);
-      collectPluginNames(value, out, depth + 1);
-    }
   }
 }
 
@@ -142,12 +140,28 @@ function table(rows, headers) {
 function main() {
   const args = process.argv.slice(2);
   const asJson = args.includes('--json');
-  const topIndex = args.indexOf('--top');
-  const top = topIndex >= 0 ? Number(args[topIndex + 1]) : Infinity;
-  const sinceIndex = args.indexOf('--since');
-  const since = sinceIndex >= 0 ? args[sinceIndex + 1] : null;
-  const logIndex = args.indexOf('--log');
-  const logFile = logIndex >= 0 ? args[logIndex + 1] : DEFAULT_LOG;
+
+  const valueOf = (flag) => {
+    const at = args.indexOf(flag);
+    if (at < 0) return null;
+    const next = args[at + 1];
+    if (next === undefined || next.startsWith('--')) {
+      console.error(`  ! ${flag} needs a value. Ignoring it.`);
+      return null;
+    }
+    return next;
+  };
+
+  const rawTop = valueOf('--top');
+  let top = Infinity;
+  if (rawTop !== null) {
+    const parsed = Number(rawTop);
+    if (!Number.isFinite(parsed) || parsed < 1) console.error(`  ! --top ${rawTop} is not a positive number. Ignoring it.`);
+    else top = Math.floor(parsed);
+  }
+
+  const since = valueOf('--since');
+  const logFile = valueOf('--log') ?? DEFAULT_LOG;
 
   let records = readLog(logFile);
   if (since) records = records.filter((r) => typeof r.ts === 'string' && r.ts >= since);

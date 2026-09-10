@@ -10,6 +10,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const rules = loadRules();
 
 const FAKE_GITHUB_TOKEN = ['ghp', 'a'.repeat(36)].join('_');
+const FAKE_AWS_KEY = ['AK', 'IA', 'IOSFODNN7EXAMPLE'].join('');
 
 function rulesFor(text) {
   return new Set(scanText('fixture.txt', text, rules).map((f) => f.rule));
@@ -84,8 +85,26 @@ test('secret previews do not reproduce the whole secret', () => {
   assert.ok(token.preview.includes('...'));
 });
 
-test('preview leaves short matches alone', () => {
-  assert.equal(preview('short'), 'short');
+test('preview never reproduces a secret, however short', () => {
+  for (const secret of ['zxqvbj', 'hunter2hunter2', 'zq', FAKE_AWS_KEY, 'x'.repeat(60)]) {
+    const shown = preview(secret);
+    assert.ok(!shown.includes(secret), `preview reproduced the whole value: ${shown}`);
+    assert.ok(shown.includes(`${secret.length} chars`), `preview should state the length: ${shown}`);
+  }
+});
+
+test('preview keeps enough context to locate a finding', () => {
+  const shown = preview(FAKE_AWS_KEY);
+  assert.ok(shown.startsWith('AKIAIO'), shown);
+  assert.ok(shown.includes('...'), shown);
+});
+
+test('every secret-severity finding in a scan is previewed, not printed', () => {
+  const secret = ['ghp', 'z'.repeat(36)].join('_');
+  const findings = scanText('f.txt', `token here ${secret}`, rules);
+  for (const f of findings.filter((x) => x.severity === 'secret')) {
+    assert.ok(!f.preview.includes(secret), `${f.rule} leaked the value into its preview`);
+  }
 });
 
 test('private values are detected verbatim and case-insensitively', () => {

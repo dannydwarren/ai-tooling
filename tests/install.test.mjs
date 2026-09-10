@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { isManagedCommand, stripManaged, addManaged, catalogEntries, canonical } from '../scripts/claude-install.mjs';
 import { render, unrender, placeholdersIn, derivedValues, jsonEscaped, requiredValueKeys, loadPrivateValues } from '../scripts/lib/template.mjs';
-import { toPosix, toSlash } from '../scripts/lib/paths.mjs';
+import { toPosix, toSlash, REPO_ROOT } from '../scripts/lib/paths.mjs';
 import { checkPlaceholders, validate } from '../scripts/checks/validate-assets.mjs';
 
 const VALUES = { REPO_ROOT_SLASH: 'C:/src/ai-tooling', USER_HOME: 'C:\\Users\\Someone' };
@@ -12,17 +12,39 @@ const FOREIGN = {
   SessionStart: [{ hooks: [{ type: 'command', command: 'echo hello' }] }],
 };
 
-test('recognises this repo commands as managed and leaves others alone', () => {
-  assert.ok(isManagedCommand('node "C:/src/ai-tooling/tools/claude/hooks/skill-audit.mjs"'));
-  assert.ok(isManagedCommand('node "C:\\src\\ai-tooling\\tools\\claude\\hooks\\no-comments.mjs"'));
+const HOOKS_DIR = `${toSlash(REPO_ROOT)}/tools/claude/hooks`;
+const managed = (script) => `node "${HOOKS_DIR}/${script}"`;
+
+test('recognises this checkout as managed, in either path spelling', () => {
+  assert.ok(isManagedCommand(managed('skill-audit.mjs')));
+  assert.ok(isManagedCommand(`node "${REPO_ROOT}\\tools\\claude\\hooks\\no-comments.mjs"`));
   assert.ok(!isManagedCommand('echo hello'));
   assert.ok(!isManagedCommand(undefined));
+});
+
+test('hooks belonging to another checkout or to the user are never claimed', () => {
+  assert.ok(!isManagedCommand('bash /home/me/dotfiles/tools/claude/hooks/greet.sh'));
+  assert.ok(!isManagedCommand('node D:/other-repo/tools/claude/hooks/mine.mjs'));
+  assert.ok(!isManagedCommand(`node "${REPO_ROOT}-2/tools/claude/hooks/x.mjs"`), 'a sibling checkout is not this one');
+});
+
+test('a group with no hooks array, or an empty one, survives untouched', () => {
+  const before = {
+    SessionStart: [{ matcher: 'startup' }, { hooks: [{ type: 'command', command: 'echo mine' }] }],
+    Stop: [{ matcher: '*', hooks: [] }],
+  };
+  assert.deepEqual(stripManaged(before), before, 'the installer must not prune what it does not own');
+});
+
+test('an event whose value is not an array is passed through rather than dropped', () => {
+  const before = { SomeFutureEvent: { shape: 'unknown' } };
+  assert.deepEqual(stripManaged(before), before);
 });
 
 test('stripping managed hooks preserves hand written ones exactly', () => {
   const before = {
     SessionStart: [{ hooks: [{ type: 'command', command: 'cat wip.md' }] }],
-    PreToolUse: [{ matcher: 'Skill', hooks: [{ type: 'command', command: 'node "/x/tools/claude/hooks/skill-audit.mjs"' }] }],
+    PreToolUse: [{ matcher: 'Skill', hooks: [{ type: 'command', command: managed('skill-audit.mjs') }] }],
   };
   const after = stripManaged(before);
   assert.deepEqual(after.SessionStart, before.SessionStart);
@@ -35,7 +57,7 @@ test('stripping keeps sibling hooks inside a shared matcher group', () => {
       matcher: 'Edit|Write',
       hooks: [
         { type: 'command', command: 'prettier --write' },
-        { type: 'command', command: 'node "/x/tools/claude/hooks/no-comments.mjs"' },
+        { type: 'command', command: managed('no-comments.mjs') },
       ],
     }],
   };
@@ -124,7 +146,7 @@ test('capturing settings strips the hooks the installer generates', async () => 
     env: { A: '1' },
     hooks: {
       SessionStart: [{ hooks: [{ type: 'command', command: 'cat wip.md' }] }],
-      PreToolUse: [{ matcher: 'Skill', hooks: [{ type: 'command', command: 'node "/x/tools/claude/hooks/skill-audit.mjs"' }] }],
+      PreToolUse: [{ matcher: 'Skill', hooks: [{ type: 'command', command: managed('skill-audit.mjs') }] }],
     },
   }, null, 2);
 
@@ -143,7 +165,7 @@ test('capturing settings with no hooks at all is left alone', async () => {
 test('capturing settings drops the hooks key when only managed hooks existed', async () => {
   const { withoutManagedHooks } = await import('../scripts/claude-capture.mjs');
   const live = JSON.stringify({
-    hooks: { PreToolUse: [{ matcher: 'Skill', hooks: [{ type: 'command', command: 'node "/x/tools/claude/hooks/a.mjs"' }] }] },
+    hooks: { PreToolUse: [{ matcher: 'Skill', hooks: [{ type: 'command', command: managed('a.mjs') }] }] },
   });
   assert.ok(!('hooks' in JSON.parse(withoutManagedHooks(live))));
 });
@@ -180,12 +202,47 @@ test('unrender then render round trips', () => {
 });
 
 test('unrender prefers the longest matching value', () => {
-  const values = { SHORT: 'C:\\Users\\Me', LONG: 'C:\\Users\\Me\\.claude' };
-  assert.equal(unrender('C:\\Users\\Me\\.claude', values), '{{LONG}}');
+  const values = { SHORT: 'C:\\Users\\Mine', LONG: 'C:\\Users\\Mine\\.claude' };
+  assert.equal(unrender('C:\\Users\\Mine\\.claude', values), '{{LONG}}');
 });
 
 test('unrender is case insensitive because Windows paths vary in case', () => {
-  assert.equal(unrender('c:\\users\\me', { HOME: 'C:\\Users\\Me' }), '{{HOME}}');
+  assert.equal(unrender('c:\\users\\mine', { HOME: 'C:\\Users\\Mine' }), '{{HOME}}');
+});
+
+test('a value cannot be substituted into a placeholder already written', () => {
+  const values = { PROJECT_CODENAME: 'claude', USER_HOME: 'C:\\Users\\Someone' };
+  const out = unrender('C:\\Users\\Someone\\.claude and the claude project', values);
+
+  assert.ok(!/\{\{\{\{/.test(out), `nested placeholder produced: ${out}`);
+  assert.equal(out, '{{USER_HOME}}\\.{{PROJECT_CODENAME}} and the {{PROJECT_CODENAME}} project');
+  assert.equal(
+    render(out, values).text,
+    'C:\\Users\\Someone\\.claude and the claude project',
+    'the round trip must be lossless',
+  );
+});
+
+test('overlapping values resolve to one match, never a partial overwrite', () => {
+  const values = { A: 'abcdefgh', B: 'defghijk' };
+  const out = unrender('xx abcdefghijk yy', values);
+  assert.equal(out, 'xx {{A}}ijk yy');
+  assert.equal(render(out, values).text, 'xx abcdefghijk yy');
+});
+
+test('values shorter than the floor are ignored, so common words are safe', () => {
+  assert.equal(unrender('The device is deviant', { ENV_NAME: 'dev' }), 'The device is deviant');
+});
+
+test('unrender then render round trips for every real value', () => {
+  const values = derivedValues();
+  const original = [
+    `${values.USER_HOME}\\work`,
+    `${values.USER_HOME_POSIX}/work`,
+    `${values.CLAUDE_HOME}\\skills`,
+    `${values.REPO_ROOT_SLASH}/tools`,
+  ].join(' | ');
+  assert.equal(render(unrender(original, values), values).text, original);
 });
 
 test('json escaping doubles backslashes so settings.json round trips', () => {

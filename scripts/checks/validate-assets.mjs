@@ -134,11 +134,47 @@ export function checkPluginManifest(root = REPO_ROOT) {
   return problems;
 }
 
+export function checkHookParity(root = REPO_ROOT) {
+  const problems = [];
+  const catalog = readJson(path.join(root, 'tools', 'claude', 'settings', 'hooks.json'), { hooks: [] });
+  const manifest = readJson(path.join(root, 'tools', 'claude', 'hooks', 'hooks.json'), { hooks: {} });
+
+  const scriptOf = (command) => (/hooks\/([A-Za-z0-9._-]+\.mjs)/.exec(command ?? '') ?? [])[1];
+
+  const catalogPairs = new Set(
+    (catalog.hooks ?? [])
+      .filter((e) => e.enabled)
+      .map((e) => `${e.event}|${e.matcher ?? ''}|${scriptOf(e.hook?.command)}`),
+  );
+
+  const manifestPairs = new Set();
+  for (const [event, groups] of Object.entries(manifest.hooks ?? {})) {
+    for (const group of groups ?? []) {
+      for (const hook of group.hooks ?? []) {
+        manifestPairs.add(`${event}|${group.matcher ?? ''}|${scriptOf(hook.command)}`);
+      }
+    }
+  }
+
+  for (const pair of catalogPairs) {
+    if (!manifestPairs.has(pair)) {
+      problems.push(`hooks/hooks.json: the plugin manifest is missing ${pair.split('|').join(' ')}, which the enabled catalog installs. The plugin install route would behave differently from the script route.`);
+    }
+  }
+  for (const pair of manifestPairs) {
+    if (!catalogPairs.has(pair)) {
+      problems.push(`settings/hooks.json: no enabled catalog entry matches plugin manifest hook ${pair.split('|').join(' ')}.`);
+    }
+  }
+  return problems;
+}
+
 export function validate(root = REPO_ROOT) {
   return [
     ...checkSkills(root),
     ...checkCommands(root),
     ...checkHookCatalog(root),
+    ...checkHookParity(root),
     ...checkPlaceholders(root),
     ...checkPluginManifest(root),
   ];

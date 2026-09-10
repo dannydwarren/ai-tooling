@@ -17,7 +17,11 @@ export function relFiles(dir) {
 }
 
 export function readText(file) {
-  return fs.readFileSync(file, 'utf8');
+  return stripBom(fs.readFileSync(file, 'utf8'));
+}
+
+export function stripBom(text) {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
 }
 
 export function writeText(file, text) {
@@ -27,7 +31,11 @@ export function writeText(file, text) {
 
 export function readJson(file, fallback = null) {
   if (!fs.existsSync(file)) return fallback;
-  return JSON.parse(readText(file));
+  try {
+    return JSON.parse(readText(file));
+  } catch (err) {
+    throw new Error(`${file} is not valid JSON: ${err.message}`, { cause: err });
+  }
 }
 
 export function writeJson(file, value) {

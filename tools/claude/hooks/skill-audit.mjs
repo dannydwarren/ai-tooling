@@ -4,6 +4,12 @@ import path from 'node:path';
 import { readPayload, runHook, repoRoot, redact, isMain } from './lib/hook-io.mjs';
 
 const ARG_PREVIEW_CHARS = 160;
+const FIELD_CHARS = 512;
+
+function capped(value) {
+  if (typeof value !== 'string') return value ?? null;
+  return value.length > FIELD_CHARS ? value.slice(0, FIELD_CHARS) : value;
+}
 
 export function logPath() {
   if (process.env.AI_TOOLING_SKILL_LOG) return process.env.AI_TOOLING_SKILL_LOG;
@@ -55,11 +61,11 @@ export function buildRecord(payload, now) {
     event: payload?.hook_event_name ?? null,
     invocation: expansion ? 'user' : 'model',
     tool: payload?.tool_name ?? null,
-    skill: skill || null,
+    skill: capped(skill || null),
     namespace: namespaceOf(skill),
-    cwd: payload?.cwd ?? null,
-    project: projectOf(payload?.cwd),
-    session_id: payload?.session_id ?? null,
+    cwd: capped(payload?.cwd ?? null),
+    project: capped(projectOf(payload?.cwd)),
+    session_id: capped(payload?.session_id ?? null),
     args: argsPreview(expansion ? payload.command_input : (toolInput.args ?? toolInput.arguments)),
   };
 
