@@ -152,8 +152,14 @@ function main() {
   console.log(`  values: ${fs.existsSync(VALUES_FILE) ? VALUES_FILE : `${VALUES_FILE} (absent)`}`);
 
   for (const problem of problems) console.error(`  ! ${problem}`);
-  if (changes.length === 0) console.log('  up to date, nothing to do');
-  else for (const change of changes) console.log(`  ${args.check ? 'would ' : ''}${change}`);
+
+  if (problems.length > 0) {
+    console.error(`  ${changes.length} pending change(s) withheld until the values above are defined.`);
+  } else if (changes.length === 0) {
+    console.log('  up to date, nothing to do');
+  } else {
+    for (const change of changes) console.log(`  ${args.check ? 'would ' : ''}${change}`);
+  }
 
   if (problems.length > 0) process.exit(1);
   if (args.check && changes.length > 0) process.exit(1);
