@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { isCodeFile, commentLines, introducedComments, editPairs, report } from '../tools/claude/hooks/no-comments.mjs';
+import { isCodeFile, commentLines, introducedComments, editPairs, report, addedLines, introducedFromResponse } from '../tools/claude/hooks/no-comments.mjs';
+
+const C = '/' + '/';
+const NOTE = `${C} pre-existing note`;
+const NEW = `${C} brand new explanation`;
+const ORIGINAL = `${NOTE}\nconst a = 1;\nconst b = 2;\n`;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const HOOK = path.join(here, '..', 'tools', 'claude', 'hooks', 'no-comments.mjs');
@@ -76,6 +81,83 @@ test('the report names the file and caps the listing at eight lines', () => {
   const text = report('src/a.ts', lines);
   assert.ok(text.includes('src/a.ts'));
   assert.equal(text.split('\n').length, 2 + 8);
+});
+
+test('addedLines takes only the + side of a patch, without the marker', () => {
+  const patch = [{ lines: [' context', '-removed', '+added one', '+added two'] }];
+  assert.deepEqual(addedLines(patch), ['added one', 'added two']);
+});
+
+test('addedLines spans every hunk and tolerates a malformed patch', () => {
+  assert.deepEqual(addedLines([{ lines: ['+a'] }, { lines: ['+b'] }]), ['a', 'b']);
+  assert.deepEqual(addedLines([]), []);
+  assert.deepEqual(addedLines(undefined), []);
+  assert.deepEqual(addedLines([{}]), []);
+});
+
+test('a Write over an existing file does not re-flag its existing comments', () => {
+  const introduced = introducedFromResponse({
+    type: 'update',
+    originalFile: ORIGINAL,
+    structuredPatch: [{ lines: [' ' + NOTE, '-const a = 1;', '+const a = 9;'] }],
+  });
+  assert.deepEqual(introduced, [], 'this was the false positive that made the hook unusable on real repos');
+});
+
+test('a comment merely moved within the file is not treated as introduced', () => {
+  const introduced = introducedFromResponse({
+    type: 'update',
+    originalFile: ORIGINAL,
+    structuredPatch: [{ lines: ['-' + NOTE, ' const a = 1;', '+' + NOTE] }],
+  });
+  assert.deepEqual(introduced, [], 'the line already existed, so relocating it introduces nothing');
+});
+
+test('a genuinely new comment in a rewrite is still caught', () => {
+  const introduced = introducedFromResponse({
+    type: 'update',
+    originalFile: ORIGINAL,
+    structuredPatch: [{ lines: [' ' + NOTE, '+' + NEW, ' const a = 1;'] }],
+  });
+  assert.deepEqual(introduced, [NEW]);
+});
+
+test('a create falls back to input, since a patch-based check would see nothing', () => {
+  assert.equal(
+    introducedFromResponse({ type: 'create', originalFile: null, structuredPatch: [] }),
+    null,
+    'create sends originalFile null and an empty patch; returning [] here would silently stop flagging new files',
+  );
+});
+
+test('a missing or unusable tool_response falls back rather than passing everything', () => {
+  assert.equal(introducedFromResponse(undefined), null);
+  assert.equal(introducedFromResponse({}), null);
+  assert.equal(introducedFromResponse({ originalFile: ORIGINAL }), null);
+  assert.equal(introducedFromResponse({ structuredPatch: [] }), null);
+});
+
+test('end to end: a Write over an existing commented file is silent', () => {
+  const { code } = runHook({
+    tool_name: 'Write',
+    tool_input: { file_path: 'a.ts', content: `${NOTE}\nconst a = 9;\n` },
+    tool_response: {
+      type: 'update',
+      originalFile: ORIGINAL,
+      structuredPatch: [{ lines: [' ' + NOTE, '-const a = 1;', '+const a = 9;'] }],
+    },
+  });
+  assert.equal(code, 0);
+});
+
+test('end to end: creating a file with a comment still blocks', () => {
+  const { code, stderr } = runHook({
+    tool_name: 'Write',
+    tool_input: { file_path: 'a.ts', content: `${NEW}\nconst a = 1;\n` },
+    tool_response: { type: 'create', originalFile: null, structuredPatch: [] },
+  });
+  assert.equal(code, 2);
+  assert.match(stderr, /brand new explanation/);
 });
 
 test('end to end: passes a non-code file', () => {

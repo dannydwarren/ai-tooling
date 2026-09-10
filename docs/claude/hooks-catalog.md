@@ -82,18 +82,30 @@ Detection rules, ported from the original bash version:
   whitespace, or if it has code followed by whitespace then `//` then whitespace-or-end-of-line.
 - **`https://` is not a comment.** Requiring whitespace or end-of-line after `//` is what excludes
   URLs. `const u = "https://x"` does not match.
-- **Only introduced comments count.** Lines present verbatim in `old_string` are subtracted, so
-  editing near an existing comment does not trip it.
+- **Only introduced comments count.** The verdict is taken from the diff, not the input — see below.
 - At most 8 offending lines are listed.
 
-**Known false positives**, all inherited from the original spec rather than introduced by the port:
+**How "introduced" is decided.** The original script subtracted comment lines found in
+`old_string`. That works for `Edit` but is wrong for `Write`, which sends `content` with no
+`old_string`, so every comment already in the file counted as new. Rewriting any commented file
+produced a wall of false positives, which made the hook unusable on a real repo.
+
+The harness supplies a better signal. `tool_response` carries `originalFile` (the full prior
+content) and `structuredPatch` (the diff, whose lines are prefixed `+`, `-` or space). The hook now
+takes the `+` lines and subtracts any comment already present in `originalFile`, so a comment that
+was merely moved is not reported either.
+
+A **create** is the exception: it sends `originalFile: null` and `structuredPatch: []`. Trusting the
+patch there would silently stop flagging new files, so that case falls back to inspecting the input
+directly, as does any payload without a usable `tool_response`.
+
+**Remaining false positives**, inherited from the original spec rather than introduced by the port:
 
 | Input | Why it trips |
 |---|---|
-| A wrapped expression whose continuation line starts with `*`, e.g. `const x = a\n  * b;` | Indistinguishable from a jsdoc `* ` line without parsing |
+| A wrapped expression whose continuation line starts with `*`, e.g. `const x = a` / `  * b;` | Indistinguishable from a jsdoc `* ` line without parsing |
 | A markdown bullet inside a template literal | Same rule, no awareness of string context |
 | A string literal containing ` // `, e.g. `const sep = ' // ';` | The trailing-comment rule does not know it is inside a string |
-| `Write` to an **existing** file | `Write` supplies `content` with no `old_string`, so every pre-existing comment counts as introduced |
 
 Only single-line `a * b` and `a / b` are covered by the tests; the wrapped form is not caught by
 them and will trip the hook.
@@ -106,7 +118,8 @@ above become tiresome, set `"enabled": false` for `no-comments` in
 Two things to keep in mind now that it is live:
 
 - **It is global.** It fires in every repo, including work repos where comments are normal and
-  expected. The `Write`-over-an-existing-file case above is the one that will surface there.
+  expected. Only comments this session actually adds are reported, so existing commented code is
+  left alone.
 - **It does not know when you asked for comments.** `CLAUDE.md` permits them when you explicitly
   request them; the hook has no way to see that request and will push for their removal anyway.
 

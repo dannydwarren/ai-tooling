@@ -39,6 +39,27 @@ export function editPairs(toolInput) {
   }];
 }
 
+export function addedLines(structuredPatch) {
+  if (!Array.isArray(structuredPatch)) return [];
+  const added = [];
+  for (const hunk of structuredPatch) {
+    for (const line of hunk?.lines ?? []) {
+      if (typeof line === 'string' && line.startsWith('+')) added.push(line.slice(1));
+    }
+  }
+  return added;
+}
+
+export function introducedFromResponse(toolResponse) {
+  const original = toolResponse?.originalFile;
+  if (typeof original !== 'string') return null;
+  if (!Array.isArray(toolResponse?.structuredPatch)) return null;
+
+  const preexisting = new Set(commentLines(original));
+  return commentLines(addedLines(toolResponse.structuredPatch).join('\n'))
+    .filter((line) => !preexisting.has(line));
+}
+
 export function introducedComments(toolInput) {
   const introduced = [];
   for (const { next, prev } of editPairs(toolInput)) {
@@ -67,7 +88,8 @@ if (isMain(import.meta.url)) {
     const filePath = payload?.tool_input?.file_path;
     if (!isCodeFile(filePath)) process.exit(EXIT_OK);
 
-    const introduced = introducedComments(payload.tool_input);
+    const introduced = introducedFromResponse(payload.tool_response)
+      ?? introducedComments(payload.tool_input);
     if (introduced.length === 0) process.exit(EXIT_OK);
 
     block(report(filePath, introduced));
