@@ -32,6 +32,19 @@ command or a `Skill` tool call; nothing in the payload says which is which. The 
 where the definition lives on disk, so the hook records the name and the *analyzer* looks it up.
 That is why `/wip` was being reported as a skill when it is a command.
 
+**Classification is by definition, deliberately, and it will occasionally look wrong.** Claude Code
+presents plugin *commands* to the model as entries in its available-skills list, invocable through
+the `Skill` tool. So a report row reading `command` can correspond to something Claude itself
+called a skill and invoked as one. For example
+`engineering:utilities:address-review-comments` is
+`commands/utilities/address-review-comments.md` — a command file, with `argument-hint` and
+`allowed-tools` frontmatter — yet every recorded invocation of it arrived as
+`event: PreToolUse, tool: Skill`.
+
+The file wins, because the file is the thing you can act on. When you are deciding whether a plugin
+earns its context, "5 skills and 43 commands" describes its shape; "48 skills" would hide that. The
+invocation path is a property of the call, not of the thing being called.
+
 **Agents are different and knowable up front.** `SubagentStart` is used rather than `PreToolUse` on
 the `Agent` tool, because it fires however the subagent was started and carries `agent_type`
 directly. `SubagentStop` fires too but is ignored when counting, so one agent run is one invocation

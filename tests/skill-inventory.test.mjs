@@ -267,6 +267,22 @@ test('coverage is broken down per kind', async () => {
 test('a used name is classified by where it lives, not by how it was invoked', async () => {
   const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
   const rows = [{ owner: 'p', enabled: true, skills: [{ name: 'p:thing', kind: 'command' }] }];
-  const stats = coverage(rows, usageBySkill([{ ts: '2026-09-10T10:00:00Z', name: 'p:thing' }]));
-  assert.equal(stats.skills[0].kind, 'command', 'a slash command is a command even though it reaches the Skill tool');
+
+  const viaSkillTool = usageBySkill([
+    { ts: '2026-09-10T10:00:00Z', event: 'PreToolUse', tool: 'Skill', name: 'p:thing', invocation: 'model' },
+  ]);
+  assert.equal(
+    coverage(rows, viaSkillTool).skills[0].kind,
+    'command',
+    'Claude exposes plugin commands through the Skill tool; the definition still decides the kind',
+  );
+
+  const viaTyping = usageBySkill([
+    { ts: '2026-09-10T10:00:00Z', event: 'UserPromptExpansion', name: 'p:thing', invocation: 'user' },
+  ]);
+  assert.equal(
+    coverage(rows, viaTyping).skills[0].kind,
+    'command',
+    'the same definition classifies the same way however it was reached',
+  );
 });
