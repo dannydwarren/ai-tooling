@@ -49,13 +49,13 @@ test('each sample trips the specific rule it was written for', () => {
   }
 });
 
-test('the corpus is assembled at runtime so no whole credential is ever committed', () => {
+test('the corpus is assembled at runtime so nothing detectable is ever committed', () => {
   const source = fs.readFileSync(path.join(here, 'fixtures', 'known-bad.mjs'), 'utf8');
-  const findings = scanText('known-bad.mjs', source, rules.filter((r) => r.severity === 'secret'));
+  const findings = scanText('known-bad.mjs', source, rules);
   assert.deepEqual(
-    findings.map((f) => f.rule),
+    findings.map((f) => `${f.rule}:${f.line}`),
     [],
-    'the fixture source must not contain a complete secret literal, or third-party push protection will reject it',
+    'the fixture source must not contain a complete literal, or third-party push protection will reject it',
   );
 });
 

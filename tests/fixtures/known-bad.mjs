@@ -19,11 +19,11 @@ export const SAMPLES = [
   { rule: 'otel-headers', text: j('OTEL_EXPORTER_OTLP_HEADERS', '="', 'Authorization=Redacted', '"') },
   { rule: 'claude-credentials-file', text: j('"', 'accessToken', '": "value"') },
   { rule: 'email-address', text: j('someone', '@', 'example.com') },
-  { rule: 'phone-number', text: '(555) 123-4567' },
-  { rule: 'phone-number', text: '555-123-4567' },
+  { rule: 'phone-number', text: j('(555', ') ', '123', '-', '4567') },
+  { rule: 'phone-number', text: j('555', '-', '123', '-', '4567') },
   { rule: 'windows-user-path', text: j('C:', '\\Users\\', 'SomePerson', '\\Documents') },
   { rule: 'posix-user-path', text: j('/', 'home', '/', 'someperson', '/projects') },
-  { rule: 'uuid', text: '123e4567-e89b-12d3-a456-426614174000' },
+  { rule: 'uuid', text: j('123e4567', '-', 'e89b', '-', '12d3', '-', 'a456', '-', '426614174000') },
 ];
 
 export const CORPUS = SAMPLES.map((s) => s.text).join('\n');
