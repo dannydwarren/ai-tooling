@@ -98,6 +98,36 @@ and subtracts the namespaces that actually appear in the log. Those are the cand
 uninstalling and pulling in as one-offs when genuinely needed. Judge them over a meaningful window —
 a plugin used once a quarter looks identical to a dead one after a week of data.
 
+## The other half: what you are paying for
+
+The usage report tells you what you *used*. It says nothing until data accumulates, and on its own
+it cannot tell you the size of the bill. The inventory does:
+
+```bash
+npm run skills:inventory
+```
+
+```
+entries  desc   owner                  on?  used?  source
+-------  -----  ---------------------  ---  -----  ------------------------------
+48       6.9kb  engineering            yes  -      jobnimbus v3.4.1
+14       1.8kb  superpowers            yes  -      claude-plugins-official v6.3.0
+14       7.1kb  platform-api-creation  yes  -      jobnimbus v1.5.0
+19       3.9kb  observability          no   -      jobnimbus v1.2.0
+```
+
+It walks the plugin cache and counts every skill **and command** each owner contributes, along with
+the description bytes, because descriptions are what actually occupy the context window in every
+session. `on?` reflects `enabledPlugins` in settings, so plugins that are merely cached are shown
+but excluded from the totals — they cost nothing today.
+
+Put the two together and the decision makes itself. An owner with a large `entries` count and a
+`used?` of `NO` over a meaningful window is context you pay for on every single turn and never
+spend. Uninstall it, and pull the one or two skills you actually want in as one-offs.
+
+`used?` shows `-` until the audit log has data, since claiming something is unused on zero
+observations would be worse than saying nothing.
+
 ## Design notes
 
 **The hook never blocks.** It always exits 0 and swallows its own exceptions. An audit logger that

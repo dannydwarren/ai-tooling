@@ -29,6 +29,7 @@ npm run build            # json + asset validation, secret/PII scan, tests
 npm run claude:check     # what would change in ~/.claude, without writing
 npm run claude:install   # install hooks and copy skills/commands into ~/.claude
 npm run skills:report    # which skills you actually use
+npm run skills:inventory     # what every session is paying for in context
 npm run claude:plugin-hooks  # what hooks your installed plugins run silently
 ```
 
@@ -53,7 +54,8 @@ so the same assets can be installed the plugin way instead — see
 
 **Audits skill usage.** Two hooks record every skill invocation to `tmp/logs/skill-audit.jsonl`,
 distinguishing the ones you type from the ones the model chooses. `npm run skills:report` turns that
-into a usage table and flags installed plugins you never actually invoke. See
+into a usage table; `npm run skills:inventory` shows what each installed plugin costs you in context
+whether you use it or not. Together they answer which plugins are bloat. See
 [docs/claude/skill-audit.md](docs/claude/skill-audit.md).
 
 **Keeps secrets and PII out.** `npm run build` runs a static scanner over every tracked and
