@@ -114,15 +114,29 @@ test('an unresolved placeholder in a hook command is a hard error', () => {
   assert.throws(() => addManaged({}, entries, VALUES), /NO_SUCH_VALUE/);
 });
 
-test('the shipped catalog installs the audit hook and holds no-comments back', () => {
+test('the shipped catalog wires each hook to the event it needs', () => {
   const entries = catalogEntries();
   const byId = Object.fromEntries(entries.map((e) => [e.id, e]));
+
   assert.equal(byId['skill-audit'].enabled, true);
   assert.equal(byId['skill-audit'].event, 'PreToolUse');
   assert.equal(byId['skill-audit'].matcher, 'Skill');
-  assert.equal(byId['no-comments'].enabled, false);
+
+  assert.equal(byId['skill-audit-typed'].enabled, true);
+  assert.equal(byId['skill-audit-typed'].event, 'UserPromptExpansion');
+
+  assert.equal(byId['no-comments'].enabled, true);
   assert.equal(byId['no-comments'].event, 'PostToolUse');
   assert.equal(byId['no-comments'].matcher, 'Edit|Write');
+});
+
+test('the audit is complete: both invocation paths are enabled together', () => {
+  const byId = Object.fromEntries(catalogEntries().map((e) => [e.id, e]));
+  assert.equal(
+    byId['skill-audit'].enabled,
+    byId['skill-audit-typed'].enabled,
+    'enabling one path without the other records half the skills and looks like complete data',
+  );
 });
 
 test('drift detection ignores key order, so a reordered settings file is not rewritten', () => {

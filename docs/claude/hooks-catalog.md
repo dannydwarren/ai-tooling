@@ -65,8 +65,6 @@ Both hooks are strictly passive: they always exit 0 and swallow their own errors
 that can break a session is worse than no audit logger. Full design in
 [skill-audit.md](skill-audit.md).
 
-## Available but disabled
-
 ### `no-comments` — `PostToolUse` on `Edit|Write`
 
 Enforces the no-code-comments rule from `CLAUDE.md`. When an `Edit` or `Write` introduces a comment
@@ -100,18 +98,23 @@ Detection rules, ported from the original bash version:
 Only single-line `a * b` and `a / b` are covered by the tests; the wrapped form is not caught by
 them and will trip the hook.
 
-**Off by default**, deliberately. It is the only hook here that can interrupt work, and a false
-positive on a real edit is far more annoying than a missed comment. The list above is why. Turn it
-on once you trust the rate:
+**Enabled 2026-09-10.** It is the only hook here that can interrupt work, so if the false positives
+above become tiresome, set `"enabled": false` for `no-comments` in
+[../../tools/claude/settings/hooks.json](../../tools/claude/settings/hooks.json) and re-run
+`npm run claude:install`.
 
-```bash
-# set "enabled": true for no-comments in tools/claude/settings/hooks.json
-npm run claude:install
-```
+Two things to keep in mind now that it is live:
+
+- **It is global.** It fires in every repo, including work repos where comments are normal and
+  expected. The `Write`-over-an-existing-file case above is the one that will surface there.
+- **It does not know when you asked for comments.** `CLAUDE.md` permits them when you explicitly
+  request them; the hook has no way to see that request and will push for their removal anyway.
 
 Its behaviour is pinned by fifteen tests in
 [../../tests/no-comments.test.mjs](../../tests/no-comments.test.mjs), including the URL and division
 false-positive cases, so changing the patterns will tell you if you broke something.
+
+## Available but disabled
 
 ### `skill-audit-post` — `PostToolUse` on `Skill`
 

@@ -42,10 +42,10 @@
     },
     {
       "id": "no-comments",
-      "enabled": false,
+      "enabled": true,
       "event": "PostToolUse",
       "matcher": "Edit|Write",
-      "description": "Reject code comments introduced by Edit/Write in known code file types, per the CLAUDE.md no-comments rule. Exits 2 so the message is fed back to Claude. Off by default until the false-positive rate is trusted.",
+      "description": "Reject code comments introduced by Edit/Write in known code file types, per the CLAUDE.md no-comments rule. PostToolUse runs after the write, so exit 2 is a correction fed back to Claude rather than a veto. Enabled 2026-09-10; see hooks-catalog.md for the known false positives.",
       "hook": {
         "type": "command",
         "command": "node \"{{REPO_ROOT_SLASH}}/tools/claude/hooks/no-comments.mjs\"",
