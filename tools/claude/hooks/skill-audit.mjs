@@ -30,7 +30,8 @@ export function namespaceOf(skill) {
 
 export function projectOf(cwd) {
   if (!cwd) return null;
-  return path.basename(cwd.replace(/[\\/]+$/, '')) || null;
+  const segments = String(cwd).split(/[\\/]+/).filter(Boolean);
+  return segments[segments.length - 1] ?? null;
 }
 
 export function argsPreview(raw) {

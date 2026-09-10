@@ -39,10 +39,14 @@ test('derives the namespace from a plugin-qualified name', () => {
   assert.equal(namespaceOf(null), null);
 });
 
-test('derives the project from the cwd', () => {
+test('derives the project from the cwd regardless of separator or host platform', () => {
   assert.equal(projectOf('C:\\src\\ai-tooling'), 'ai-tooling');
+  assert.equal(projectOf('C:/src/ai-tooling'), 'ai-tooling');
   assert.equal(projectOf('/home/x/repo/'), 'repo');
+  assert.equal(projectOf('/c/src/ai-tooling'), 'ai-tooling');
+  assert.equal(projectOf('C:\\src\\ai-tooling\\'), 'ai-tooling');
   assert.equal(projectOf(null), null);
+  assert.equal(projectOf(''), null);
 });
 
 test('builds a record with the fields the analyzer needs', () => {

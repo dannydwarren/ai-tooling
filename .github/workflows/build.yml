@@ -8,11 +8,13 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -21,6 +23,6 @@ jobs:
       - name: Build
         run: node scripts/build.mjs
 
-      - name: Scan strictly and report PII
+      - name: Report PII strictly
         run: node scripts/checks/scan.mjs --strict
         continue-on-error: true
