@@ -23,6 +23,7 @@
     "claude:plugin-hooks": "node scripts/claude-plugin-hooks.mjs",
     "skills:inventory": "node scripts/claude-skill-inventory.mjs",
     "install-git-hooks": "node scripts/install-git-hooks.mjs",
-    "uninstall-git-hooks": "node scripts/install-git-hooks.mjs --uninstall"
+    "uninstall-git-hooks": "node scripts/install-git-hooks.mjs --uninstall",
+    "skills:used": "node scripts/claude-skill-inventory.mjs --used"
   }
 }

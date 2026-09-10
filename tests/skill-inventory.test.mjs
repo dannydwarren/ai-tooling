@@ -112,3 +112,82 @@ test('the real inventory reports this repo and marks it enabled', () => {
   assert.ok(mine.skills.some((s) => s.name === 'pr-review-cycle'));
   assert.ok(mine.skills.some((s) => s.name === 'wip'), 'commands count toward context too');
 });
+
+test('stamp renders a local datetime and tolerates junk', async () => {
+  const { stamp } = await import('../scripts/claude-skill-inventory.mjs');
+  assert.match(stamp('2026-09-08T09:12:04.000Z'), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  assert.equal(stamp(undefined), '-');
+  assert.equal(stamp('not a date'), '-');
+  assert.equal(stamp(12345), '-');
+});
+
+test('usage is counted per skill with a first and last timestamp', async () => {
+  const { usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const map = usageBySkill([
+    { ts: '2026-09-09T10:00:00Z', skill: 'a', invocation: 'user' },
+    { ts: '2026-09-08T10:00:00Z', skill: 'a', invocation: 'model' },
+    { ts: '2026-09-10T10:00:00Z', skill: 'a', invocation: 'user' },
+    { ts: '2026-09-09T11:00:00Z', skill: 'b', invocation: 'model' },
+  ]);
+
+  const a = map.get('a');
+  assert.equal(a.count, 3);
+  assert.equal(a.typed, 2);
+  assert.equal(a.auto, 1);
+  assert.equal(a.first, '2026-09-08T10:00:00Z', 'first must be the earliest, not the first line');
+  assert.equal(a.last, '2026-09-10T10:00:00Z');
+  assert.equal(map.get('b').count, 1);
+});
+
+test('usage ignores PostToolUse records and nameless entries', async () => {
+  const { usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const map = usageBySkill([
+    { ts: '2026-09-09T10:00:00Z', skill: 'a', event: 'PreToolUse' },
+    { ts: '2026-09-09T10:00:01Z', skill: 'a', event: 'PostToolUse' },
+    { ts: '2026-09-09T10:00:02Z', skill: null },
+  ]);
+  assert.equal(map.get('a').count, 1);
+  assert.equal(map.size, 1);
+});
+
+test('coverage counts distinct enabled names and separates the unavailable', async () => {
+  const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const rows = [
+    { owner: 'p', enabled: true, skills: [{ name: 'p:one' }, { name: 'p:two' }] },
+    { owner: 'off', enabled: false, skills: [{ name: 'off:x' }] },
+  ];
+  const usage = usageBySkill([
+    { ts: '2026-09-08T10:00:00Z', skill: 'p:one' },
+    { ts: '2026-09-09T10:00:00Z', skill: 'builtin-thing' },
+  ]);
+
+  const stats = coverage(rows, usage);
+  assert.equal(stats.total, 2, 'a disabled plugin cannot be used, so it is not in the denominator');
+  assert.equal(stats.usedCount, 1);
+  assert.equal(stats.untracked.length, 1);
+  assert.equal(stats.untracked[0].skill, 'builtin-thing');
+  assert.equal(stats.first, '2026-09-08T10:00:00Z');
+  assert.equal(stats.last, '2026-09-09T10:00:00Z');
+});
+
+test('coverage counts a name shipped as both skill and command once', async () => {
+  const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const rows = [{ owner: 'p', enabled: true, skills: [{ name: 'p:dup' }, { name: 'p:dup' }] }];
+  assert.equal(coverage(rows, usageBySkill([])).total, 1);
+});
+
+test('coverage on an empty log reports no usage rather than throwing', async () => {
+  const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const stats = coverage([{ owner: 'p', enabled: true, skills: [{ name: 'x' }] }], usageBySkill([]));
+  assert.equal(stats.usedCount, 0);
+  assert.equal(stats.first, null);
+  assert.equal(stats.last, null);
+  assert.deepEqual(stats.skills, []);
+});
+
+test('usedIn counts only the owner rows own skills', async () => {
+  const { usedIn, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const usage = usageBySkill([{ ts: '2026-09-09T10:00:00Z', skill: 'p:one' }]);
+  assert.equal(usedIn({ skills: [{ name: 'p:one' }, { name: 'p:two' }] }, usage), 1);
+  assert.equal(usedIn({ skills: [{ name: 'q:one' }] }, usage), 0);
+});

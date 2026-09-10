@@ -108,12 +108,20 @@ npm run skills:inventory
 ```
 
 ```
-entries  desc   owner            on?  used?  source
--------  -----  ---------------  ---  -----  ------------------------------
-48       6.9kb  big-work-plugin  yes  -      work-marketplace v3.4.1
-14       1.8kb  superpowers      yes  -      claude-plugins-official v6.3.0
-3        0.7kb  ai-tooling       yes  -      this repo
-19       3.9kb  cached-plugin    no   -      work-marketplace v1.2.0
+entries  used   desc   owner            on?  source
+-------  ----   -----  ---------------  ---  ------------------------------
+48       1/48   6.9kb  big-work-plugin  yes  work-marketplace v3.4.1
+14       1/14   1.8kb  superpowers      yes  claude-plugins-official v6.3.0
+3        2/3    0.7kb  ai-tooling       yes  this repo
+19       0/19   3.9kb  cached-plugin    no   work-marketplace v1.2.0
+
+  82 skills and commands, ~18kb of descriptions, loaded every session.
+  cached-plugin is cached but disabled, so it costs nothing today.
+
+  used:  4 of 82 distinct enabled skills (5%)
+  first: 2026-09-08 03:12
+  last:  2026-09-10 09:26
+  plus 1 used but not in the inventory (built-in, or since removed).
 ```
 
 (Owner names above are illustrative. Run it to see your own.)
@@ -123,12 +131,39 @@ the description bytes, because descriptions are what actually occupy the context
 session. `on?` reflects `enabledPlugins` in settings, so plugins that are merely cached are shown
 but excluded from the totals — they cost nothing today.
 
-Put the two together and the decision makes itself. An owner with a large `entries` count and a
-`used?` of `NO` over a meaningful window is context you pay for on every single turn and never
-spend. Uninstall it, and pull the one or two skills you actually want in as one-offs.
+Put the two together and the decision makes itself. An owner with a large `entries` count stuck at
+`0/N` over a meaningful window is context you pay for on every single turn and never spend.
+Uninstall it, and pull the one or two skills you actually want in as one-offs.
 
-`used?` shows `-` until the audit log has data, since claiming something is unused on zero
-observations would be worse than saying nothing.
+**Two counts, and they measure different things.** `entries` is what *loads* — a plugin that ships
+a skill and a same-named command contributes both, and both occupy context. The coverage line
+counts *distinct names*, since those are what you can actually invoke. When they differ, the report
+says so rather than leaving you to reconcile two numbers.
+
+Skills used but absent from the inventory are reported separately rather than folded in. Those are
+Claude's built-ins, which live nowhere on disk, or something since uninstalled — counting them in a
+denominator of installed skills would be wrong either way.
+
+### Just the skills you used
+
+```bash
+npm run skills:used
+```
+
+```
+n  typed  auto  skill                       owner                first used        last used
+-  -----  ----  --------------------------  -------------------  ----------------  ----------------
+3  3      0     wip                         ai-tooling           2026-09-08 03:12  2026-09-10 01:58
+2  2      0     engineering:utilities:ship  big-work-plugin      2026-09-08 03:40  2026-09-09 10:44
+2  0      2     superpowers:brainstorming   superpowers          2026-09-08 08:02  2026-09-10 09:26
+1  0      1     dataviz                     built-in or removed  2026-09-10 04:22  2026-09-10 04:22
+```
+
+This lists **only skills that were actually invoked** — never the full catalogue. It is the view for
+"what do I actually reach for", where the summary above is "what am I carrying". Times are local;
+the log itself stores UTC.
+
+Both accept `--log <path>` to read a different log and `--json` for machine-readable output.
 
 ## Design notes
 

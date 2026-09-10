@@ -154,10 +154,117 @@ function table(rows, headers) {
   return [line(headers), line(widths.map((w) => '-'.repeat(w))), ...rows.map(line)].join('\n');
 }
 
+export function stamp(ts) {
+  if (typeof ts !== 'string') return '-';
+  const when = new Date(ts);
+  if (Number.isNaN(when.getTime())) return '-';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
+}
+
+export function usageBySkill(records) {
+  const map = new Map();
+  for (const record of records) {
+    if (record?.event === 'PostToolUse') continue;
+    const skill = record?.skill;
+    if (!skill) continue;
+    let stat = map.get(skill);
+    if (!stat) {
+      stat = { skill, count: 0, typed: 0, auto: 0, first: record.ts, last: record.ts };
+      map.set(skill, stat);
+    }
+    stat.count += 1;
+    if (record.invocation === 'user') stat.typed += 1;
+    else stat.auto += 1;
+    if (typeof record.ts === 'string') {
+      if (typeof stat.first !== 'string' || record.ts < stat.first) stat.first = record.ts;
+      if (typeof stat.last !== 'string' || record.ts > stat.last) stat.last = record.ts;
+    }
+  }
+  return map;
+}
+
+export function coverage(rows, usage) {
+  const available = new Map();
+  for (const row of rows) {
+    if (row.enabled === false) continue;
+    for (const skill of row.skills) available.set(skill.name, row.owner);
+  }
+
+  const used = [];
+  const untracked = [];
+  for (const [name, stat] of usage) {
+    if (available.has(name)) used.push({ ...stat, owner: available.get(name) });
+    else untracked.push({ ...stat, owner: 'built-in or removed' });
+  }
+
+  const all = [...used, ...untracked].sort((a, b) => b.count - a.count || a.skill.localeCompare(b.skill));
+  const stamps = all.map((s) => s.first).filter((t) => typeof t === 'string').sort();
+  const lasts = all.map((s) => s.last).filter((t) => typeof t === 'string').sort();
+
+  return {
+    total: available.size,
+    usedCount: used.length,
+    untracked,
+    skills: all,
+    first: stamps[0] ?? null,
+    last: lasts[lasts.length - 1] ?? null,
+  };
+}
+
+export function usedIn(row, usage) {
+  return row.skills.filter((s) => usage.has(s.name)).length;
+}
+
 function main() {
+  const args = process.argv.slice(2);
+  const detail = args.includes('--used');
+  const asJson = args.includes('--json');
+  const logAt = args.indexOf('--log');
+  const logFile = logAt >= 0 && args[logAt + 1] && !args[logAt + 1].startsWith('--')
+    ? args[logAt + 1]
+    : DEFAULT_LOG;
+
   const rows = inventory();
-  const used = new Set(readLog(DEFAULT_LOG).map((r) => r.skill).filter(Boolean));
-  const usedOwners = new Set([...used].map((s) => (s.includes(':') ? s.slice(0, s.indexOf(':')) : null)).filter(Boolean));
+  const usage = usageBySkill(readLog(logFile));
+  const stats = coverage(rows, usage);
+
+  if (asJson) {
+    console.log(JSON.stringify({
+      log: logFile,
+      total: stats.total,
+      used: stats.usedCount,
+      first: stats.first,
+      last: stats.last,
+      skills: stats.skills,
+      owners: rows.map((r) => ({
+        owner: r.owner,
+        kind: r.kind,
+        enabled: r.enabled,
+        entries: r.skills.length,
+        used: usedIn(r, usage),
+        bytes: r.skills.reduce((n, s) => n + s.bytes, 0),
+      })),
+    }, null, 2));
+    return;
+  }
+
+  if (detail) {
+    console.log('Skills actually used');
+    console.log(`  log: ${logFile}`);
+    if (stats.skills.length === 0) {
+      console.log('  nothing recorded yet.');
+      return;
+    }
+    console.log('');
+    console.log(table(
+      stats.skills.map((s) => [s.count, s.typed, s.auto, s.skill, s.owner, stamp(s.first), stamp(s.last)]),
+      ['n', 'typed', 'auto', 'skill', 'owner', 'first used', 'last used'],
+    ));
+    console.log('');
+    console.log(`  ${stats.skills.length} distinct skill(s) used. Times are local.`);
+    return;
+  }
 
   console.log('Skill inventory — what is loaded into every session');
   console.log(`  cache: ${CACHE}`);
@@ -166,20 +273,22 @@ function main() {
   const totals = rows
     .map((r) => [
       r.skills.length,
+      `${usedIn(r, usage)}/${r.skills.length}`,
       `${Math.round(r.skills.reduce((n, s) => n + s.bytes, 0) / 1024 * 10) / 10}kb`,
       r.owner,
       r.enabled === false ? 'no' : 'yes',
-      used.size === 0 ? '-' : (usedOwners.has(r.owner) || r.skills.some((s) => used.has(s.name)) ? 'yes' : 'NO'),
       r.detail,
     ])
     .sort((a, b) => b[0] - a[0]);
 
-  console.log(table(totals, ['entries', 'desc', 'owner', 'on?', 'used?', 'source']));
+  console.log(table(totals, ['entries', 'used', 'desc', 'owner', 'on?', 'source']));
 
   const live = rows.filter((r) => r.enabled !== false);
   const liveCount = live.reduce((n, r) => n + r.skills.length, 0);
   const liveBytes = live.reduce((n, r) => n + r.skills.reduce((m, s) => m + s.bytes, 0), 0);
   const cachedOnly = rows.filter((r) => r.enabled === false);
+
+  const percent = stats.total === 0 ? 0 : Math.round((stats.usedCount / stats.total) * 100);
 
   console.log('');
   console.log(`  ${liveCount} skills and commands, ~${Math.round(liveBytes / 1024)}kb of descriptions, loaded every session.`);
@@ -187,17 +296,30 @@ function main() {
     console.log(`  ${cachedOnly.map((r) => r.owner).join(', ')} are cached but disabled, so they cost nothing today.`);
   }
 
-  if (used.size === 0) {
+  console.log('');
+  console.log(`  used:  ${stats.usedCount} of ${stats.total} distinct enabled skills (${percent}%)`);
+  console.log(`  first: ${stamp(stats.first)}`);
+  console.log(`  last:  ${stamp(stats.last)}`);
+  if (stats.untracked.length > 0) {
+    console.log(`  plus ${stats.untracked.length} used but not in the inventory (built-in, or since removed).`);
+  }
+  if (liveCount !== stats.total) {
+    console.log(`  (${liveCount} entries but ${stats.total} distinct names: some plugins ship a skill and a same-named command, and both load.)`);
+  }
+
+  if (stats.skills.length === 0) {
     console.log('');
-    console.log('  The "used?" column needs audit data. Use Claude for a while, then re-run.');
-    console.log('  An owner that stays NO over a meaningful window is context you pay for and never spend:');
+    console.log('  No usage recorded yet. Use Claude for a while, then re-run.');
+    console.log('  An owner stuck at 0/N over a meaningful window is context you pay for and never spend:');
     console.log('  uninstall it and pull the one or two skills you want in as one-offs.');
   } else {
-    const unused = totals.filter((t) => t[3] === 'yes' && t[4] === 'NO').map((t) => t[2]);
+    const unused = rows.filter((r) => r.enabled !== false && usedIn(r, usage) === 0).map((r) => r.owner);
     if (unused.length > 0) {
       console.log('');
       console.log(`  Enabled but never invoked in this window: ${unused.join(', ')}`);
     }
+    console.log('');
+    console.log('  Run with --used to list each skill that was actually invoked.');
   }
 }
 

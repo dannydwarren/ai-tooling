@@ -30,6 +30,7 @@ npm run claude:check     # what would change in ~/.claude, without writing
 npm run claude:install   # install hooks and copy skills/commands into ~/.claude
 npm run skills:report    # which skills you actually use
 npm run skills:inventory     # what every session is paying for in context
+npm run skills:used          # only the skills you actually invoked
 npm run claude:plugin-hooks  # what hooks your installed plugins run silently
 npm run install-git-hooks    # gate every push on the build (do this once)
 ```
