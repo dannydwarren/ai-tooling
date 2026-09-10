@@ -6,7 +6,7 @@ import { render, unrender, placeholdersIn, derivedValues, jsonEscaped, requiredV
 import { toPosix, toSlash, REPO_ROOT } from '../scripts/lib/paths.mjs';
 import { checkPlaceholders, validate } from '../scripts/checks/validate-assets.mjs';
 
-const VALUES = { REPO_ROOT_SLASH: 'C:/src/ai-tooling', USER_HOME: 'C:\\Users\\Someone' };
+const VALUES = { REPO_ROOT_SLASH: toSlash(REPO_ROOT), USER_HOME: 'C:\\Users\\Someone' };
 
 const FOREIGN = {
   SessionStart: [{ hooks: [{ type: 'command', command: 'echo hello' }] }],
