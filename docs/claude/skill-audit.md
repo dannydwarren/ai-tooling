@@ -108,13 +108,15 @@ npm run skills:inventory
 ```
 
 ```
-entries  desc   owner                  on?  used?  source
--------  -----  ---------------------  ---  -----  ------------------------------
-48       6.9kb  engineering            yes  -      jobnimbus v3.4.1
-14       1.8kb  superpowers            yes  -      claude-plugins-official v6.3.0
-14       7.1kb  platform-api-creation  yes  -      jobnimbus v1.5.0
-19       3.9kb  observability          no   -      jobnimbus v1.2.0
+entries  desc   owner            on?  used?  source
+-------  -----  ---------------  ---  -----  ------------------------------
+48       6.9kb  big-work-plugin  yes  -      work-marketplace v3.4.1
+14       1.8kb  superpowers      yes  -      claude-plugins-official v6.3.0
+3        0.7kb  ai-tooling       yes  -      this repo
+19       3.9kb  cached-plugin    no   -      work-marketplace v1.2.0
 ```
+
+(Owner names above are illustrative. Run it to see your own.)
 
 It walks the plugin cache and counts every skill **and command** each owner contributes, along with
 the description bytes, because descriptions are what actually occupy the context window in every

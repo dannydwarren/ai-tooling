@@ -88,9 +88,21 @@ Detection rules, ported from the original bash version:
   editing near an existing comment does not trip it.
 - At most 8 offending lines are listed.
 
+**Known false positives**, all inherited from the original spec rather than introduced by the port:
+
+| Input | Why it trips |
+|---|---|
+| A wrapped expression whose continuation line starts with `*`, e.g. `const x = a\n  * b;` | Indistinguishable from a jsdoc `* ` line without parsing |
+| A markdown bullet inside a template literal | Same rule, no awareness of string context |
+| A string literal containing ` // `, e.g. `const sep = ' // ';` | The trailing-comment rule does not know it is inside a string |
+| `Write` to an **existing** file | `Write` supplies `content` with no `old_string`, so every pre-existing comment counts as introduced |
+
+Only single-line `a * b` and `a / b` are covered by the tests; the wrapped form is not caught by
+them and will trip the hook.
+
 **Off by default**, deliberately. It is the only hook here that can interrupt work, and a false
-positive on a real edit is far more annoying than a missed comment. Turn it on once you trust the
-rate:
+positive on a real edit is far more annoying than a missed comment. The list above is why. Turn it
+on once you trust the rate:
 
 ```bash
 # set "enabled": true for no-comments in tools/claude/settings/hooks.json

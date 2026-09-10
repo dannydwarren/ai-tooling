@@ -18,8 +18,33 @@ function parseArgs(argv) {
   return {
     check: argv.includes('--check'),
     uninstall: argv.includes('--uninstall'),
+    prune: argv.includes('--prune'),
     verbose: argv.includes('--verbose'),
   };
+}
+
+export function removeEmptyParents(dir, stopAt) {
+  let current = path.resolve(dir);
+  const boundary = path.resolve(stopAt);
+  while (current.startsWith(boundary) && current !== boundary) {
+    if (!fs.existsSync(current) || fs.readdirSync(current).length > 0) return;
+    fs.rmdirSync(current);
+    current = path.dirname(current);
+  }
+}
+
+export function orphans(planned) {
+  const expected = new Set(planned.map((item) => path.resolve(item.destFile).toLowerCase()));
+  const found = [];
+  for (const dir of ['skills', 'commands']) {
+    const root = path.join(CLAUDE_HOME, dir);
+    if (!fs.existsSync(root)) continue;
+    for (const rel of relFiles(root)) {
+      const abs = path.join(root, rel.split('/').join(path.sep));
+      if (!expected.has(path.resolve(abs).toLowerCase())) found.push(abs);
+    }
+  }
+  return found;
 }
 
 export function plannedContent(values) {
@@ -150,6 +175,23 @@ function main() {
     if (!exists || !sameText(current, item.text)) {
       changes.push(`${exists ? 'update' : 'create'} ${item.destFile}`);
       if (!args.check && missingValues.size === 0) writeText(item.destFile, item.text);
+    }
+  }
+
+  const stale = args.uninstall ? [] : orphans(planned);
+  if (stale.length > 0) {
+    if (args.prune) {
+      for (const file of stale) {
+        changes.push(`remove ${file}`);
+        if (!args.check && missingValues.size === 0) {
+          fs.rmSync(file, { force: true });
+          removeEmptyParents(path.dirname(file), CLAUDE_HOME);
+        }
+      }
+    } else {
+      console.error(`  ! ${stale.length} file(s) in ${CLAUDE_HOME} are not tracked in this repo:`);
+      for (const file of stale) console.error(`      ${path.relative(CLAUDE_HOME, file)}`);
+      console.error('    Either capture them (npm run claude:capture) or delete them (--prune).');
     }
   }
 

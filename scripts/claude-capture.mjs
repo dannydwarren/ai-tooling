@@ -35,6 +35,9 @@ export function templateKeys() {
   return [...Object.keys(loadPrivateValues()), ...Object.keys(derivedValues())];
 }
 
+export const WORKSPACE_CLAUDE_MD = process.env.AI_TOOLING_WORKSPACE_CLAUDE_MD
+  ?? path.join(path.dirname(REPO_ROOT), 'CLAUDE.md');
+
 export function mcpServers(file = path.join(USER_HOME, '.claude.json')) {
   if (!fs.existsSync(file)) return null;
   try {
@@ -78,6 +81,22 @@ export function plan() {
       srcFile: path.join(USER_HOME, '.claude.json'),
       destFile: path.join(TARGET, 'settings', 'mcp-servers.json'),
       text: unrender(`${JSON.stringify(backup, null, 2)}\n`, values, keys),
+    });
+  }
+
+  if (fs.existsSync(WORKSPACE_CLAUDE_MD)) {
+    const header = [
+      '<!--',
+      'Backup of the workspace-level CLAUDE.md that sits alongside this checkout and applies to',
+      'every repo under it. Captured by scripts/claude-capture.mjs. NOT installed automatically:',
+      'it lives outside ~/.claude and outside this repo, so restoring it is a deliberate copy.',
+      '-->',
+      '',
+    ].join('\n');
+    items.push({
+      srcFile: WORKSPACE_CLAUDE_MD,
+      destFile: path.join(TARGET, 'workspace-CLAUDE.md'),
+      text: unrender(header + readText(WORKSPACE_CLAUDE_MD), values, keys),
     });
   }
 

@@ -144,6 +144,55 @@ allowlist, not a denylist, which is the right shape for this problem — a new f
 The `.gitignore` additionally blocks `**/.credentials.json`, `**/settings.local.json`, `backups/`
 and key material by extension, as a second line of defence.
 
+## What the build cannot enforce
+
+Be clear about the limits, because a check you believe in but that does not run is worse than no
+check.
+
+**The private-value rule only works on this machine.** `privateValueRules()` is built from
+`~/.ai-tooling/values.json`, which by design is not in the repo and therefore does not exist on a CI
+runner. On GitHub Actions the scan reports `0 private value(s)` and passes regardless. The mechanism
+that stops employer-internal identifiers reaching a public repo is a **local pre-push check, not a
+CI gate**. `security/required-values.json` validates placeholder *names*, not values, and does not
+close this.
+
+Install the git hook so it cannot be forgotten:
+
+```bash
+npm run install-git-hooks
+```
+
+That adds a `pre-push` hook running `npm run build`, which refuses the push on any secret-severity
+finding — including a leaked private value.
+
+**PII never fails CI.** `build.yml` runs the normal build (PII reports, does not fail) plus a strict
+pass with `continue-on-error: true`. That is deliberate — see the two-severities section — but it
+means the literal reading of "never reveal PII" is enforced by review and the local strict run, not
+by the pipeline.
+
+**The scanner only knows shapes it has patterns for.** It will not catch a personal name, a street
+address, an internal project codename, or a credential format nobody has written a rule for. It
+raises the floor; it is not a guarantee.
+
+## Accepted disclosures
+
+Some employer-adjacent naming is published deliberately. Recording it here makes it a decision
+rather than an oversight, and makes it easy to revisit.
+
+| What | Where | Why it is accepted |
+|---|---|---|
+| Employer name | `LICENSE` author, git history, `CLAUDE.md` prose | Already public via the commit author email and GitHub profile. Not recoverable by redaction. |
+| Plugin names and versions (`engineering`, `platform-api-creation`, …) | `tools/claude/settings/*.json` | This is the machine-rebuild record; stripping it makes the backup useless. Names disclose that internal tooling exists, not what it does. |
+| Snowflake warehouse / database / schema names | `tools/claude/settings/mcp-servers.json` | Generic names with no access value. The account identifier and login *are* templated. |
+| Linear workspace slug | `tools/claude/CLAUDE.md` | Part of a URL template in the work-tracking instructions; equals the employer name. |
+
+Templated out instead, because they disclose internal infrastructure: the MSK cluster name, the
+example consumer group, the internal marketplace repository name, the Snowflake account, and the
+work email. Those live in the values file and are enforced as `secret`-severity rules.
+
+If you disagree with any row above, add the value to `~/.ai-tooling/values.json`, replace it with a
+`{{PLACEHOLDER}}`, and the scanner will keep it out from then on.
+
 ## If something does leak
 
 Rewriting history is not enough on its own — assume anything pushed to a public repo has been

@@ -21,6 +21,8 @@
     "claude:capture:check": "node scripts/claude-capture.mjs --check",
     "skills:report": "node scripts/analyze-skill-log.mjs",
     "claude:plugin-hooks": "node scripts/claude-plugin-hooks.mjs",
-    "skills:inventory": "node scripts/claude-skill-inventory.mjs"
+    "skills:inventory": "node scripts/claude-skill-inventory.mjs",
+    "install-git-hooks": "node scripts/install-git-hooks.mjs",
+    "uninstall-git-hooks": "node scripts/install-git-hooks.mjs --uninstall"
   }
 }

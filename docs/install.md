@@ -89,6 +89,31 @@ It does **not** restore `tools/claude/settings/settings.json` over your live set
 a backup for rebuilding a machine, not an input to the installer. To use it, render the
 placeholders and merge it by hand.
 
+### Removing things you deleted from the repo
+
+Deleting a skill here does not delete it from `~/.claude`. The installer reports files it finds on
+the machine that this repo does not track, and removes them only when you ask:
+
+```bash
+npm run claude:install -- --prune
+```
+
+Without `--prune` it lists them and suggests `npm run claude:capture` if you meant to keep them.
+Empty directories left behind are cleaned up.
+
+### Making the scan run before every push
+
+The private-value check only works where `~/.ai-tooling/values.json` exists, which is never true on
+a CI runner. Install the git hook so the local build gates the push:
+
+```bash
+npm run install-git-hooks     # adds a pre-push hook running npm run build
+npm run uninstall-git-hooks   # removes it
+```
+
+It refuses to overwrite a `pre-push` hook it did not write. Bypass a single push deliberately with
+`git push --no-verify`. See [security.md](security.md).
+
 ### Uninstall
 
 ```bash
@@ -150,13 +175,18 @@ plugin's hook without enabling the whole plugin. See
 
 ## What is backed up but not installed
 
-Two files under `tools/claude/settings/` are captured for rebuilding a machine and are deliberately
-never written back automatically.
+These files are captured for rebuilding a machine and are deliberately never written back
+automatically.
 
 **[settings.json](../tools/claude/settings/settings.json)** — a copy of the live settings with this
 repo's own managed hooks stripped out, so it records the hand-maintained configuration (env,
 permissions, enabled plugins, marketplaces, your own hooks) rather than anything the installer
 generates. Restoring it means merging the parts you want by hand.
+
+**[workspace-CLAUDE.md](../tools/claude/workspace-CLAUDE.md)** — the `CLAUDE.md` sitting in the
+parent directory of this checkout, which applies to every repo beneath it. It is AI configuration
+and worth backing up, but it lives outside `~/.claude`, so restoring it is a deliberate copy.
+Override the location with `AI_TOOLING_WORKSPACE_CLAUDE_MD`.
 
 **[mcp-servers.json](../tools/claude/settings/mcp-servers.json)** — the `mcpServers` block from
 `~/.claude.json`. That file is large and stateful, holding session history and account state, so it
