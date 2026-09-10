@@ -151,7 +151,7 @@ test('usage ignores PostToolUse records and nameless entries', async () => {
 });
 
 test('coverage counts distinct enabled names and separates the unavailable', async () => {
-  const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const { coverage, usageBySkill, BUILT_IN } = await import('../scripts/claude-skill-inventory.mjs');
   const rows = [
     { owner: 'p', enabled: true, skills: [{ name: 'p:one' }, { name: 'p:two' }] },
     { owner: 'off', enabled: false, skills: [{ name: 'off:x' }] },
@@ -164,10 +164,36 @@ test('coverage counts distinct enabled names and separates the unavailable', asy
   const stats = coverage(rows, usage);
   assert.equal(stats.total, 2, 'a disabled plugin cannot be used, so it is not in the denominator');
   assert.equal(stats.usedCount, 1);
-  assert.equal(stats.untracked.length, 1);
-  assert.equal(stats.untracked[0].skill, 'builtin-thing');
+  assert.equal(stats.builtins.length, 1);
+  assert.equal(stats.builtins[0].skill, 'builtin-thing');
+  assert.equal(stats.builtins[0].owner, BUILT_IN);
   assert.equal(stats.first, '2026-09-08T10:00:00Z');
   assert.equal(stats.last, '2026-09-09T10:00:00Z');
+});
+
+test('a bare name is a built-in but a namespaced one is a plugin that went away', async () => {
+  const { coverage, usageBySkill, BUILT_IN } = await import('../scripts/claude-skill-inventory.mjs');
+  const rows = [{ owner: 'p', enabled: true, skills: [{ name: 'p:one' }] }];
+  const stats = coverage(rows, usageBySkill([
+    { ts: '2026-09-09T10:00:00Z', skill: 'dataviz' },
+    { ts: '2026-09-09T11:00:00Z', skill: 'goneplugin:oldskill' },
+  ]));
+
+  assert.deepEqual(stats.builtins.map((s) => s.skill), ['dataviz']);
+  assert.equal(stats.builtins[0].owner, BUILT_IN);
+  assert.deepEqual(stats.removed.map((s) => s.skill), ['goneplugin:oldskill']);
+  assert.match(stats.removed[0].owner, /goneplugin/);
+  assert.match(stats.removed[0].owner, /not installed/);
+});
+
+test('a skill from a disabled plugin is not credited as used', async () => {
+  const { coverage, usageBySkill } = await import('../scripts/claude-skill-inventory.mjs');
+  const rows = [{ owner: 'off', enabled: false, skills: [{ name: 'off:x' }] }];
+  const stats = coverage(rows, usageBySkill([{ ts: '2026-09-09T10:00:00Z', skill: 'off:x' }]));
+
+  assert.equal(stats.total, 0);
+  assert.equal(stats.usedCount, 0);
+  assert.equal(stats.removed.length, 1, 'it was invoked before being disabled, so it is not installed now');
 });
 
 test('coverage counts a name shipped as both skill and command once', async () => {

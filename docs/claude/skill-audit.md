@@ -108,41 +108,51 @@ npm run skills:inventory
 ```
 
 ```
-entries  used   desc   owner            on?  source
--------  ----   -----  ---------------  ---  ------------------------------
-48       1/48   6.9kb  big-work-plugin  yes  work-marketplace v3.4.1
-14       1/14   1.8kb  superpowers      yes  claude-plugins-official v6.3.0
-3        2/3    0.7kb  ai-tooling       yes  this repo
-19       0/19   3.9kb  cached-plugin    no   work-marketplace v1.2.0
+entries  used  desc   owner            source
+-------  ----  -----  ---------------  -----------------------------------------
+48       1/48  6.9kb  big-work-plugin  work-marketplace v3.4.1
+14       1/14  1.8kb  superpowers      claude-plugins-official v6.3.0
+3        2/3   0.7kb  ai-tooling       this repo
+∞        2/∞   -      built-in         ships with Claude, not enumerable on disk
 
-  82 skills and commands, ~18kb of descriptions, loaded every session.
-  cached-plugin is cached but disabled, so it costs nothing today.
+  82 installed skills and commands, ~18kb of descriptions, loaded every session.
 
-  used:  4 of 82 distinct enabled skills (5%)
+  used:  4 of 82 installed (5%), plus 2 built-in
   first: 2026-09-08 03:12
-  last:  2026-09-10 09:26
-  plus 1 used but not in the inventory (built-in, or since removed).
+  last:  2026-09-10 09:40
+  1 used skill(s) belong to a plugin that is no longer installed.
+
+  Not listed above, because they cannot be invoked: cached-plugin
+  (20 entries sitting in the plugin cache, disabled. Remove with /plugin uninstall.)
 ```
 
 (Owner names above are illustrative. Run it to see your own.)
 
 It walks the plugin cache and counts every skill **and command** each owner contributes, along with
 the description bytes, because descriptions are what actually occupy the context window in every
-session. `on?` reflects `enabledPlugins` in settings, so plugins that are merely cached are shown
-but excluded from the totals — they cost nothing today.
+session.
 
-Put the two together and the decision makes itself. An owner with a large `entries` count stuck at
-`0/N` over a meaningful window is context you pay for on every single turn and never spend.
+**The table lists only what can actually be invoked.** A plugin that is cached but disabled cannot
+be called and costs nothing, so it is not a row — it would only depress every ratio for something
+that is not there. It gets one footer line instead, with its entry count and how to purge it, so
+the information is not lost.
+
+**Built-ins get a row with `∞`.** Claude's own skills ship inside the binary and cannot be
+enumerated from disk, so there is no honest denominator for them. Showing `2/∞` says exactly that:
+two were used, out of a total this tool cannot know. They are counted separately in the summary for
+the same reason — folding them into "of 82 installed" would make the ratio meaningless.
+
+A used skill whose namespace is not installed is reported as `not installed` rather than assumed to
+be a built-in. That is either a plugin you removed or one you disabled after using it.
+
+Put the counts together and the decision makes itself. An owner with a large `entries` count stuck
+at `0/N` over a meaningful window is context you pay for on every single turn and never spend.
 Uninstall it, and pull the one or two skills you actually want in as one-offs.
 
-**Two counts, and they measure different things.** `entries` is what *loads* — a plugin that ships
-a skill and a same-named command contributes both, and both occupy context. The coverage line
-counts *distinct names*, since those are what you can actually invoke. When they differ, the report
-says so rather than leaving you to reconcile two numbers.
-
-Skills used but absent from the inventory are reported separately rather than folded in. Those are
-Claude's built-ins, which live nowhere on disk, or something since uninstalled — counting them in a
-denominator of installed skills would be wrong either way.
+**`entries` and the coverage total measure different things.** `entries` is what *loads* — a plugin
+shipping a skill and a same-named command contributes both, and both occupy context. Coverage counts
+*distinct names*, since those are what you can invoke. When the two differ the report says so rather
+than leaving you to reconcile them.
 
 ### Just the skills you used
 
@@ -151,12 +161,13 @@ npm run skills:used
 ```
 
 ```
-n  typed  auto  skill                       owner                first used        last used
--  -----  ----  --------------------------  -------------------  ----------------  ----------------
-3  3      0     wip                         ai-tooling           2026-09-08 03:12  2026-09-10 01:58
-2  2      0     engineering:utilities:ship  big-work-plugin      2026-09-08 03:40  2026-09-09 10:44
-2  0      2     superpowers:brainstorming   superpowers          2026-09-08 08:02  2026-09-10 09:26
-1  0      1     dataviz                     built-in or removed  2026-09-10 04:22  2026-09-10 04:22
+n  typed  auto  skill                       owner                       first used        last used
+-  -----  ----  --------------------------  --------------------------  ----------------  ----------------
+3  3      0     wip                         ai-tooling                  2026-09-08 03:12  2026-09-10 01:58
+2  2      0     engineering:utilities:ship  big-work-plugin             2026-09-08 03:40  2026-09-09 10:44
+2  0      2     superpowers:brainstorming   superpowers                 2026-09-08 08:02  2026-09-10 09:26
+1  0      1     dataviz                     built-in                    2026-09-10 04:22  2026-09-10 04:22
+1  0      1     goneplugin:oldskill         goneplugin (not installed)  2026-09-10 09:40  2026-09-10 09:40
 ```
 
 This lists **only skills that were actually invoked** — never the full catalogue. It is the view for
@@ -190,6 +201,16 @@ background without blocking. That is a good fit for a fire-and-forget logger and
 latency entirely. It is deliberately **not** enabled here: it has not been verified on this Claude
 Code version, and a mis-specified key that silently disables the hook would cost more than the
 165 ms it saves. Try it, then confirm the log still grows before trusting it.
+
+## Every session counts
+
+The log is machine-wide by design. A skill invoked in any Claude session on this machine lands in
+the same file, including sessions you ran in other repos and background agents. Nothing filters by
+session, project or origin, because the question being answered is "what do I get value from",
+not "what did I do in this window".
+
+The practical consequence: a fresh log fills up faster than you expect, and early numbers include
+work from sessions you were not thinking about. That is correct, not noise.
 
 ## Caveats
 

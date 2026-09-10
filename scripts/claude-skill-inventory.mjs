@@ -6,6 +6,9 @@ import { readLog, DEFAULT_LOG } from './analyze-skill-log.mjs';
 
 const CACHE = path.join(CLAUDE_HOME, 'plugins', 'cache');
 
+export const BUILT_IN = 'built-in';
+export const UNCOUNTABLE = '∞';
+
 export function frontmatter(text) {
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
   if (!match) return {};
@@ -192,20 +195,28 @@ export function coverage(rows, usage) {
   }
 
   const used = [];
-  const untracked = [];
+  const builtins = [];
+  const removed = [];
   for (const [name, stat] of usage) {
-    if (available.has(name)) used.push({ ...stat, owner: available.get(name) });
-    else untracked.push({ ...stat, owner: 'built-in or removed' });
+    if (available.has(name)) {
+      used.push({ ...stat, owner: available.get(name) });
+    } else if (name.includes(':')) {
+      removed.push({ ...stat, owner: `${name.slice(0, name.indexOf(':'))} (not installed)` });
+    } else {
+      builtins.push({ ...stat, owner: BUILT_IN });
+    }
   }
 
-  const all = [...used, ...untracked].sort((a, b) => b.count - a.count || a.skill.localeCompare(b.skill));
+  const all = [...used, ...builtins, ...removed]
+    .sort((a, b) => b.count - a.count || a.skill.localeCompare(b.skill));
   const stamps = all.map((s) => s.first).filter((t) => typeof t === 'string').sort();
   const lasts = all.map((s) => s.last).filter((t) => typeof t === 'string').sort();
 
   return {
     total: available.size,
     usedCount: used.length,
-    untracked,
+    builtins,
+    removed,
     skills: all,
     first: stamps[0] ?? null,
     last: lasts[lasts.length - 1] ?? null,
@@ -234,16 +245,22 @@ function main() {
       log: logFile,
       total: stats.total,
       used: stats.usedCount,
+      builtinsUsed: stats.builtins.length,
+      removedUsed: stats.removed.length,
       first: stats.first,
       last: stats.last,
       skills: stats.skills,
-      owners: rows.map((r) => ({
+      owners: rows.filter((r) => r.enabled !== false).map((r) => ({
         owner: r.owner,
         kind: r.kind,
-        enabled: r.enabled,
         entries: r.skills.length,
         used: usedIn(r, usage),
         bytes: r.skills.reduce((n, s) => n + s.bytes, 0),
+      })),
+      cached: rows.filter((r) => r.enabled === false).map((r) => ({
+        owner: r.owner,
+        entries: r.skills.length,
+        detail: r.detail,
       })),
     }, null, 2));
     return;
@@ -266,45 +283,57 @@ function main() {
     return;
   }
 
-  console.log('Skill inventory — what is loaded into every session');
+  const invocable = rows.filter((r) => r.enabled !== false);
+  const cached = rows.filter((r) => r.enabled === false);
+
+  console.log('Skill inventory — what can be invoked, and what it costs');
   console.log(`  cache: ${CACHE}`);
   console.log('');
 
-  const totals = rows
+  const totals = invocable
     .map((r) => [
       r.skills.length,
       `${usedIn(r, usage)}/${r.skills.length}`,
       `${Math.round(r.skills.reduce((n, s) => n + s.bytes, 0) / 1024 * 10) / 10}kb`,
       r.owner,
-      r.enabled === false ? 'no' : 'yes',
       r.detail,
     ])
     .sort((a, b) => b[0] - a[0]);
 
-  console.log(table(totals, ['entries', 'used', 'desc', 'owner', 'on?', 'source']));
+  totals.push([
+    UNCOUNTABLE,
+    `${stats.builtins.length}/${UNCOUNTABLE}`,
+    '-',
+    BUILT_IN,
+    'ships with Claude, not enumerable on disk',
+  ]);
 
-  const live = rows.filter((r) => r.enabled !== false);
-  const liveCount = live.reduce((n, r) => n + r.skills.length, 0);
-  const liveBytes = live.reduce((n, r) => n + r.skills.reduce((m, s) => m + s.bytes, 0), 0);
-  const cachedOnly = rows.filter((r) => r.enabled === false);
+  console.log(table(totals, ['entries', 'used', 'desc', 'owner', 'source']));
 
+  const liveCount = invocable.reduce((n, r) => n + r.skills.length, 0);
+  const liveBytes = invocable.reduce((n, r) => n + r.skills.reduce((m, s) => m + s.bytes, 0), 0);
   const percent = stats.total === 0 ? 0 : Math.round((stats.usedCount / stats.total) * 100);
 
   console.log('');
-  console.log(`  ${liveCount} skills and commands, ~${Math.round(liveBytes / 1024)}kb of descriptions, loaded every session.`);
-  if (cachedOnly.length > 0) {
-    console.log(`  ${cachedOnly.map((r) => r.owner).join(', ')} are cached but disabled, so they cost nothing today.`);
+  console.log(`  ${liveCount} installed skills and commands, ~${Math.round(liveBytes / 1024)}kb of descriptions, loaded every session.`);
+  if (liveCount !== stats.total) {
+    console.log(`  ${stats.total} distinct names: some plugins ship a skill and a same-named command, and both load.`);
   }
 
   console.log('');
-  console.log(`  used:  ${stats.usedCount} of ${stats.total} distinct enabled skills (${percent}%)`);
+  console.log(`  used:  ${stats.usedCount} of ${stats.total} installed (${percent}%), plus ${stats.builtins.length} ${BUILT_IN}`);
   console.log(`  first: ${stamp(stats.first)}`);
   console.log(`  last:  ${stamp(stats.last)}`);
-  if (stats.untracked.length > 0) {
-    console.log(`  plus ${stats.untracked.length} used but not in the inventory (built-in, or since removed).`);
+
+  if (stats.removed.length > 0) {
+    console.log(`  ${stats.removed.length} used skill(s) belong to a plugin that is no longer installed.`);
   }
-  if (liveCount !== stats.total) {
-    console.log(`  (${liveCount} entries but ${stats.total} distinct names: some plugins ship a skill and a same-named command, and both load.)`);
+
+  if (cached.length > 0) {
+    const entries = cached.reduce((n, r) => n + r.skills.length, 0);
+    console.log('');
+    console.log(`  Not listed above, because they cannot be invoked: ${cached.map((r) => r.owner).join(', ')}`);
+    console.log(`  (${entries} entries sitting in the plugin cache, disabled. Remove with /plugin uninstall.)`);
   }
 
   if (stats.skills.length === 0) {
@@ -313,10 +342,10 @@ function main() {
     console.log('  An owner stuck at 0/N over a meaningful window is context you pay for and never spend:');
     console.log('  uninstall it and pull the one or two skills you want in as one-offs.');
   } else {
-    const unused = rows.filter((r) => r.enabled !== false && usedIn(r, usage) === 0).map((r) => r.owner);
+    const unused = invocable.filter((r) => usedIn(r, usage) === 0).map((r) => r.owner);
     if (unused.length > 0) {
       console.log('');
-      console.log(`  Enabled but never invoked in this window: ${unused.join(', ')}`);
+      console.log(`  Installed but never invoked in this window: ${unused.join(', ')}`);
     }
     console.log('');
     console.log('  Run with --used to list each skill that was actually invoked.');
