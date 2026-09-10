@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isManagedCommand, stripManaged, addManaged, catalogEntries } from '../scripts/claude-install.mjs';
+import { isManagedCommand, stripManaged, addManaged, catalogEntries, canonical } from '../scripts/claude-install.mjs';
 import { render, unrender, placeholdersIn, derivedValues, jsonEscaped, requiredValueKeys, loadPrivateValues } from '../scripts/lib/template.mjs';
 import { toPosix, toSlash } from '../scripts/lib/paths.mjs';
 import { checkPlaceholders, validate } from '../scripts/checks/validate-assets.mjs';
@@ -100,6 +100,21 @@ test('the shipped catalog installs the audit hook and holds no-comments back', (
   assert.equal(byId['no-comments'].enabled, false);
   assert.equal(byId['no-comments'].event, 'PostToolUse');
   assert.equal(byId['no-comments'].matcher, 'Edit|Write');
+});
+
+test('drift detection ignores key order, so a reordered settings file is not rewritten', () => {
+  const a = { PreToolUse: [{ matcher: 'Skill', hooks: [{ type: 'command', command: 'x', timeout: 10 }] }] };
+  const b = { PreToolUse: [{ hooks: [{ timeout: 10, command: 'x', type: 'command' }], matcher: 'Skill' }] };
+  assert.equal(canonical(a), canonical(b));
+});
+
+test('drift detection still sees a genuine difference', () => {
+  assert.notEqual(
+    canonical({ PreToolUse: [{ matcher: 'Skill', hooks: [{ command: 'x' }] }] }),
+    canonical({ PreToolUse: [{ matcher: 'Skill', hooks: [{ command: 'y' }] }] }),
+  );
+  assert.notEqual(canonical({ a: 1 }), canonical({ a: '1' }));
+  assert.notEqual(canonical([1, 2]), canonical([2, 1]));
 });
 
 test('capturing settings strips the hooks the installer generates', async () => {

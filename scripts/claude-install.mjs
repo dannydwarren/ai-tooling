@@ -61,6 +61,15 @@ export function stripManaged(hooks) {
   return out;
 }
 
+export function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export function addManaged(hooks, entries, values) {
   const out = JSON.parse(JSON.stringify(hooks ?? {}));
   const applied = [];
@@ -118,7 +127,7 @@ function main() {
   }
 
   const settings = readJson(settingsFile, {});
-  const before = JSON.stringify(settings.hooks ?? {});
+  const before = canonical(settings.hooks ?? {});
   const stripped = stripManaged(settings.hooks);
   let nextHooks = stripped;
   let applied = [];
@@ -127,7 +136,7 @@ function main() {
     nextHooks = result.hooks;
     applied = result.applied;
   }
-  const after = JSON.stringify(nextHooks);
+  const after = canonical(nextHooks);
 
   if (before !== after) {
     changes.push(
