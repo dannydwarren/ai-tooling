@@ -316,3 +316,46 @@ test('backing up a file that does not exist is a no-op', async () => {
   const os = await import('node:os');
   assert.equal(backup(path.join(os.tmpdir(), 'not-here-98765.json')), null);
 });
+
+test('orphans finds machine files the repo no longer tracks', async () => {
+  const { orphans } = await import('../scripts/claude-install.mjs');
+  const planned = [
+    { destFile: path.join('C:', 'home', '.claude', 'skills', 'kept', 'SKILL.md') },
+  ];
+  const found = orphans(planned);
+  assert.ok(Array.isArray(found), 'orphans must return a list even against the real machine');
+  assert.ok(found.every((f) => typeof f === 'string'));
+});
+
+test('removeEmptyParents stops at the boundary and leaves non-empty dirs', async () => {
+  const { removeEmptyParents } = await import('../scripts/claude-install.mjs');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'prune-'));
+  const deep = path.join(root, 'skills', 'gone', 'nested');
+  fs.mkdirSync(deep, { recursive: true });
+
+  removeEmptyParents(deep, root);
+  assert.ok(!fs.existsSync(path.join(root, 'skills')), 'empty parents should be removed');
+  assert.ok(fs.existsSync(root), 'the boundary itself must survive');
+
+  const keep = path.join(root, 'commands');
+  fs.mkdirSync(keep, { recursive: true });
+  fs.writeFileSync(path.join(keep, 'a.md'), 'x', 'utf8');
+  removeEmptyParents(keep, root);
+  assert.ok(fs.existsSync(keep), 'a directory with content must not be removed');
+});
+
+test('the git hook installer only claims hooks it wrote', async () => {
+  const { isOurs, PRE_PUSH } = await import('../scripts/install-git-hooks.mjs');
+  assert.ok(isOurs(PRE_PUSH));
+  assert.ok(!isOurs('#!/bin/sh\nsomeone elses hook\n'));
+  assert.ok(!isOurs(undefined));
+});
+
+test('the pre-push hook runs the build and can be bypassed', async () => {
+  const { PRE_PUSH } = await import('../scripts/install-git-hooks.mjs');
+  assert.match(PRE_PUSH, /scripts\/build\.mjs/);
+  assert.match(PRE_PUSH, /--no-verify/);
+  assert.match(PRE_PUSH, /exit 1/);
+});
