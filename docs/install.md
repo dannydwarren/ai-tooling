@@ -101,18 +101,15 @@ npm run claude:install -- --prune
 Without `--prune` it lists them and suggests `npm run claude:capture` if you meant to keep them.
 Empty directories left behind are cleaned up.
 
-### Making the scan run before every push
+### Stopping Claude pushing a broken tree
 
-The private-value check only works where `~/.ai-tooling/values.json` exists, which is never true on
-a CI runner. Install the git hook so the local build gates the push:
+Nothing to install. [../.claude/settings.json](../.claude/settings.json) is tracked, and registers a
+`PreToolUse` hook that runs the full build whenever Claude tries to `git push`, denying the call if
+it fails.
 
-```bash
-npm run install-git-hooks     # adds a pre-push hook running npm run build
-npm run uninstall-git-hooks   # removes it
-```
-
-It refuses to overwrite a `pre-push` hook it did not write. Bypass a single push deliberately with
-`git push --no-verify`. See [security.md](security.md).
+It is deliberately narrow: it gates **Claude only**, in **this repository only**. Your own
+`git push` at a terminal is untouched, and no other project is affected. See
+[security.md](security.md).
 
 ### Uninstall
 

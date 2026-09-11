@@ -156,23 +156,25 @@ that stops employer-internal identifiers reaching a public repo is a **local pre
 CI gate**. `security/required-values.json` validates placeholder *names*, not values, and does not
 close this.
 
-Install the git hook so it cannot be forgotten:
+The gate is a **Claude Code hook scoped to this repository**, in
+[../.claude/settings.json](../.claude/settings.json). It fires `PreToolUse` on `Bash` and
+`PowerShell`, and [.claude/hooks/guard-push.mjs](../.claude/hooks/guard-push.mjs) checks whether the
+command is a `git push`. If it is, it runs the full build and exits 2 on failure, which denies the
+tool call.
 
-```bash
-npm run install-git-hooks
-```
+Three deliberate properties:
 
-That adds a `pre-push` hook running `npm run build`, which refuses the push on any secret-severity
-finding — including a leaked private value.
+- **It blocks Claude, not you.** A human at a terminal is unaffected. The assumption is that an
+  agent generating and committing content is the likelier source of an accidental leak, and the one
+  worth gating.
+- **It is scoped to this repository.** It lives in the repo's own `.claude/`, not in
+  `~/.claude/settings.json`, so it has no effect on any other project.
+- **There is nothing to install.** `.claude/settings.json` is tracked, so a fresh clone is guarded
+  the moment Claude reads the project settings. The first session in a new clone may ask you to
+  trust the project before project hooks run.
 
-**Be clear about how strong that guard is.** Git hooks live in `.git/hooks/`, which is never cloned,
-so a fresh clone has no guard until you run that command. To stop it being silently absent, the
-build itself warns when the hook is missing — so the thing you run regularly tells you the guard is
-not there. The warning is suppressed when `CI` is set, since a runner neither has nor needs it.
-
-It is a convention, not a control. `git push --no-verify` bypasses it, deliberately, and anyone with
-push access who never runs the build is unguarded. Treat it as the thing that catches honest
-mistakes, which is what it is, rather than something that makes a leak impossible.
+The guard exits 0 for anything that is not a push, so it costs nothing on ordinary commands, and it
+fails open on malformed input rather than blocking work.
 
 **PII never fails CI.** `build.yml` runs the normal build (PII reports, does not fail) plus a strict
 pass with `continue-on-error: true`. That is deliberate — see the two-severities section — but it

@@ -32,7 +32,6 @@ npm run skills:report    # which skills you actually use
 npm run skills:inventory     # what every session is paying for in context
 npm run skills:used          # only the skills you actually invoked
 npm run claude:plugin-hooks  # what hooks your installed plugins run silently
-npm run install-git-hooks    # gate every push on the build (do this once)
 ```
 
 There are no runtime dependencies and no install step — everything runs on the Node already on the
@@ -63,8 +62,9 @@ whether you use it or not. Together they answer which plugins are bloat. See
 **Keeps secrets and PII out.** `npm run build` runs a static scanner over every tracked and
 untracked-but-not-ignored file. Secrets fail the build; PII is reported. There is no AI in the
 build — only the scripts in this repo. Employer-internal identifiers live outside the working tree
-and are enforced as build failures, which is a *local* gate, so run `npm run install-git-hooks`
-once to make it fire before every push. See [docs/security.md](docs/security.md).
+and are enforced as build failures. That check only works locally, never on a runner, so a
+repo-scoped Claude hook runs the build before Claude is allowed to push. See
+[docs/security.md](docs/security.md).
 
 ## Documentation
 
