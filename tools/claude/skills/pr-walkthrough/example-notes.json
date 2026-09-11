@@ -1,0 +1,110 @@
+{
+  "pr": {
+    "repo": "JobNimbus/job-management",
+    "number": 332,
+    "title": "Refuse HTML markup in bound request input, and correct ADR-014's status rule",
+    "author": "@benallred",
+    "head": "arch-849-waf-input-sanitization-filter",
+    "base": "main",
+    "url": "https://github.com/JobNimbus/job-management/pull/332"
+  },
+  "summary": "No input sanitization ran anywhere in this service. This adds three classes that work together: `MarkupPolicyFilter` sits in the MVC pipeline, `RequestMarkupInspector` walks every bound action argument, and `MarkupDetector` answers one question about a single string — does it carry markup. A request holding any is refused with 422 and one error per offending field. Nothing is ever rewritten.\n\nSeparately, ADR-014's rule for choosing 400 vs 422 is rewritten to split on the kind of failure rather than on where the value bound, and `ValidateModelAttribute` is changed to match — which changes one shipped endpoint's response to a malformed body.",
+  "why": "The WAF in front of this service does not block XSS. The central web ACL runs its XSS rule group with `override_action { count {} }`, so it counts a match and forwards the request; dynamic environments get no WAF at all. Fixing that at the edge is called the better fix, but the ACL is owned outside this repo and fronts every JobNimbus API. (PR description, ARCH-849.)\n\nThe photo-report path is why it matters here: `reportData` binds as one `JsonElement` and carries the report title, section titles and photo captions, all of which `GET /v1/shared/photo-reports/{id}` serves to any holder of a share link, with no JobNimbus login. (PR description.)\n\nThis is stated as one layer, not XSS protection for job data — the monolith, API1/API2 and this service's Kafka handlers write the same documents with no such check. (PR description.)",
+  "order": [
+    "Api/Validation/MarkupPolicyFilter.cs",
+    "Api/Validation/RequestMarkupInspector.cs",
+    "Api/Validation/MarkupDetector.cs",
+    "Api/Validation/ValidateModelAttribute.cs",
+    "Api/Validation/FieldPath.cs",
+    "Api/Validation/ModelStateErrorMapper.cs",
+    "Api/Program.cs",
+    "docs/architectural-decision-records/adr-014-request-validation-model.md",
+    "docs/research/202604-job-research/P11d-markup-policy-rejected-approaches.md",
+    "Api/StageDates/Controllers/JobStageDatesController.cs",
+    "Api/StageDates/Controllers/ContactStageDatesController.cs",
+    "Api/StageDates/Get/GetStageDatesEndpointV1.cs",
+    "Api/Jobs/Create/CreateJobEndpointV1.cs",
+    "Api/Jobs/GetById/GetJobByIdEndpointV1.cs",
+    "Api/Jobs/ListDeleted/ListDeletedJobsEndpointV1.cs",
+    "Api/PhotoReports/CreateShareLink/CreateShareLinkEndpointV1.cs",
+    "Api/PhotoReports/Delete/DeletePhotoReportEndpointV1.cs",
+    "Api/PhotoReports/Download/GetPhotoReportDownloadEndpointV1.cs",
+    "Api/PhotoReports/GeneratePdf/RegeneratePhotoReportPdfEndpointV1.cs",
+    "Api/PhotoReports/Get/GetPhotoReportEndpointV1.cs",
+    "Api/PhotoReports/GetShared/GetSharedPhotoReportEndpointV1.cs",
+    "Api/PhotoReports/List/ListPhotoReportsEndpointV1.cs",
+    "terraform/api/Api_internal.json",
+    "Api/Api.csproj",
+    "Directory.Packages.props",
+    "Api.Tests/Validation/MarkupDetectorTest.cs",
+    "Api.Tests/Validation/MarkupPolicyFilterTest.cs",
+    "Api.Tests/Validation/BoundParameterTypeTest.cs",
+    "Api.Tests/Validation/ValidateModelAttributeTest.cs",
+    "Api.Tests/Validation/TypeOutsideApiAndDomain.cs",
+    "Api.Tests/Integration/MarkupPolicyPipelineTest.cs",
+    "Api.Tests/Integration/MarkupRefusalAssertions.cs",
+    "Api.Tests/Integration/PhotoReports/PhotoReportMarkupPolicyTest.cs",
+    "Api.Tests/Integration/Jobs/CreateJobEndpointV1Test.cs"
+  ],
+  "annotations": [
+    {
+      "file": "Api/Validation/MarkupPolicyFilter.cs",
+      "line": 11,
+      "title": "Every endpoint, no opt-in",
+      "text": "`Program.cs` adds this to `AddControllers` as a global filter at order `AfterModelValidation`, so it runs for every action after binding and validation — a new endpoint is covered without doing anything.\n\nA refusal never calls `next()`, so the action never executes, and the body is a `JNProblemDetails` carrying one error per offending field."
+    },
+    {
+      "file": "Api/Validation/RequestMarkupInspector.cs",
+      "line": 53,
+      "title": "It walks bound values, not the raw request",
+      "text": "`context.ActionArguments` is what the binder produced, which is why percent-encoding needs no handling here — ASP.NET decodes the path and query before binding, so `%3Cscript%3E` arrives as `<script>`.\n\nOne `Budget` covers the whole request rather than one value, and it is shared across every argument."
+    },
+    {
+      "file": "Api/Validation/RequestMarkupInspector.cs",
+      "line": 125,
+      "title": "The JsonElement branch is the photo-report path",
+      "text": "`reportData` on photo-report create and update binds as a single `JsonElement`, so attribute-based validation cannot reach inside it. This recursion is what reaches the report title, section titles, photo captions and cover-page names — the values `GET /v1/shared/photo-reports/{id}` serves to anyone holding a share link.\n\nField paths are built from JSON property names and array indices."
+    },
+    {
+      "file": "Api/Validation/RequestMarkupInspector.cs",
+      "line": 285,
+      "title": "The guard behind this set",
+      "text": "`Api.Tests/Validation/BoundParameterTypeTest.cs` fails the build when an endpoint binds a type this walk would not inspect, so the set here cannot silently fall behind the endpoints."
+    },
+    {
+      "file": "Api/Validation/MarkupDetector.cs",
+      "line": 24,
+      "title": "Two passes, the second conditional",
+      "text": "The literal scan runs first. The resolve-and-scan-again pass runs only when the value holds a reference that could produce `<`, and it defends a consumer that HTML-decodes once and then assigns to `innerHTML` — a browser builds no tag from a character reference on its own.\n\nOver `MaxResolvableLength` the value is refused rather than resolved."
+    },
+    {
+      "file": "Api/Validation/MarkupDetector.cs",
+      "line": 49,
+      "title": "What this refuses, and what it does not",
+      "text": "A tag start is `<` followed by a letter, `/`, `!` or `?`. So `Contact <bob@acme.com> for access` and `Replace <front> window` are refused, while `5 < 10` and `Apt <5>` pass.\n\nThe PR states that cost is accepted and not measured: no counter is emitted, and the log carries a field count with nothing to divide it by. It also lists what passes by design — `javascript:`, `data:text/html`, attribute breakouts, and fullwidth `＜script＞`."
+    },
+    {
+      "file": "Api/Validation/MarkupDetector.cs",
+      "line": 207,
+      "title": "The bound that keeps resolution linear",
+      "text": "Every reference search for a terminating `;` is capped, which is what stops a payload of bare ampersands costing a scan each.\n\nThe PR records that only one of the two bounds is held by a test: reverting the named bound fails the scaling test at ratio 12.2, reverting the numeric one fails nothing, so no test was written for it."
+    },
+    {
+      "file": "Api/Validation/ValidateModelAttribute.cs",
+      "line": 36,
+      "title": "The rule change, and the endpoint it moves",
+      "text": "ADR-014 used to split on where a value bound — query gets 400, body gets 422. It now splits on the failure: 422 when a well-formed value fails a content rule, 400 only when the request did not parse.\n\nThis is the mechanism. `System.Text.Json` keys a body it could not read on `$`; simple-type binders record the exception they caught. Because of it, `POST /v1/jobs` with a body of `{` answers 400 where it answered 422 — a response-contract change on a shipped endpoint."
+    },
+    {
+      "file": "Api/StageDates/Controllers/JobStageDatesController.cs",
+      "line": 26,
+      "title": "Same wire, declarable schema",
+      "text": "`Response<T>` is `record Response<T>(T Data)` and serializes to the same `{\"data\": …}` under the existing camelCase policy, so the response bytes do not change. Returning a named type is what lets the 200 be declared in `ProducesResponseType`, which is what puts it in the generated spec."
+    },
+    {
+      "file": "terraform/api/Api_internal.json",
+      "title": "Generated, and the review surface",
+      "text": "This is regenerated from the `ProducesResponseType` attributes above, not hand-edited. The PR notes those 26 declarations have no test behind them, which makes this file the place the change is checked.\n\nIt records 21 operations before and after, with no route keys added or removed."
+    }
+  ]
+}
