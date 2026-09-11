@@ -1,6 +1,6 @@
 ---
 name: pr-walkthrough
-description: Use when a dev needs to understand a pull request before reviewing it — unfamiliar codebase, unfamiliar language, or a change too tangled to follow by reading the diff top to bottom. Triggers include "walk me through this PR", "help me understand PR 123", "explain this PR to me", "I have to review this and I don't know this code". Not for reviewing, critiquing, judging, or approving code.
+description: Use when a dev needs to understand a pull request before reviewing it — unfamiliar codebase, unfamiliar language, or a change too tangled to follow by reading the diff top to bottom. Triggers include "explain https://github.com/org/repo/pull/123", "explain PR 123", "explain #123", "explain this PR", "walk me through this PR", "help me understand PR 123", "I have to review this and I don't know this code" — and any bare "explain" naming a pull request by URL, number, or #number. Not for reviewing, critiquing, judging, or approving code.
 ---
 
 # PR Walkthrough
