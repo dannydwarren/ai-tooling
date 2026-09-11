@@ -83,15 +83,15 @@ const KEYWORDS = {
 };
 
 const GRAMMARS = {
-  csharp: { line: '//', block: ['/*', '*/'], quotes: `"'`, pascal: true },
-  ts: { line: '//', block: ['/*', '*/'], quotes: `"'\`` },
+  csharp: { line: '//', block: ['/*', '*/'], quotes: `"'`, pascal: true, calls: true },
+  ts: { line: '//', block: ['/*', '*/'], quotes: `"'\``, pascal: true, calls: true },
   json: { quotes: '"', keys: true },
   hcl: { line: ['#', '//'], block: ['/*', '*/'], quotes: '"' },
   yaml: { line: '#', quotes: `"'` },
   sh: { line: '#', quotes: `"'` },
   sql: { line: '--', block: ['/*', '*/'], quotes: `'"` },
-  py: { line: '#', quotes: `"'` },
-  go: { line: '//', block: ['/*', '*/'], quotes: '"`', pascal: true },
+  py: { line: '#', quotes: `"'`, pascal: true, calls: true },
+  go: { line: '//', block: ['/*', '*/'], quotes: '"`', pascal: true, calls: true },
   css: { block: ['/*', '*/'], quotes: `"'` },
   xml: { markup: true },
   none: {},
@@ -126,10 +126,11 @@ function keywordSet(lang) {
 
 function words(plain, lang, grammar) {
   const keys = keywordSet(lang);
-  return plain.replace(/[A-Za-z_$][\w$]*|\d[\w.]*|[^A-Za-z_$\d]+/g, (piece) => {
+  return plain.replace(/[A-Za-z_$][\w$]*|\d[\w.]*|[^A-Za-z_$\d]+/g, (piece, offset) => {
     if (/^[A-Za-z_$]/.test(piece)) {
       if (keys.has(piece)) return tok('k', piece);
       if (grammar.pascal && /^[A-Z]/.test(piece)) return tok('y', piece);
+      if (grammar.calls && /^\s*\(/.test(plain.slice(offset + piece.length))) return tok('f', piece);
       return esc(piece);
     }
     if (/^\d/.test(piece)) return tok('n', piece);
@@ -387,90 +388,173 @@ const routeHtml = route
   )
   .join('');
 
+const THEMES = {
+  plex: {
+    label: 'Plex',
+    light: {
+      ground: '#fbfbfc', surface: '#ffffff', sunk: '#f3f4f7', rule: '#e2e4ea', filler: '#f7f8fa',
+      ink: '#16181d', 'ink-soft': '#5b616f', 'ink-faint': '#8b91a0',
+      accent: '#1f5fa9', 'accent-soft': '#eaf1f9',
+      'add-bg': '#e9f4ec', 'add-ink': '#1b3a25', 'add-mark': '#2f7d46',
+      'del-bg': '#fdeceb', 'del-ink': '#3d1a19', 'del-mark': '#b3403f',
+      'tok-k': '#8250a8', 'tok-s': '#a04a1e', 'tok-c': '#586070',
+      'tok-n': '#10656b', 'tok-y': '#1f5fa9', 'tok-key': '#1b4f8a',
+      'tok-f': '#7a5200',
+    },
+    dark: {
+      ground: '#131519', surface: '#181b21', sunk: '#1e222a', rule: '#2b3039', filler: '#15181d',
+      ink: '#e7e9ee', 'ink-soft': '#a2a9b8', 'ink-faint': '#6f7787',
+      accent: '#7fb2ef', 'accent-soft': '#1b2735',
+      'add-bg': '#16281c', 'add-ink': '#cfe8d6', 'add-mark': '#4c9a64',
+      'del-bg': '#2c1a1a', 'del-ink': '#f0d4d2', 'del-mark': '#cd6260',
+      'tok-k': '#cba0ec', 'tok-s': '#e8a877', 'tok-c': '#a3abba',
+      'tok-n': '#63cdc2', 'tok-y': '#86b6ef', 'tok-key': '#9dc6f5',
+      'tok-f': '#e5c07b',
+    },
+  },
+  graphite: {
+    label: 'Graphite',
+    light: {
+      ground: '#f7f7f7', surface: '#ffffff', sunk: '#eeeeee', rule: '#dcdcdc', filler: '#f2f2f2',
+      ink: '#1b1b1b', 'ink-soft': '#5c5c5c', 'ink-faint': '#8c8c8c',
+      accent: '#3c6b8f', 'accent-soft': '#e9eff4',
+      'add-bg': '#e4efe6', 'add-ink': '#1f3527', 'add-mark': '#3a7a4d',
+      'del-bg': '#f6e6e5', 'del-ink': '#3a1f1e', 'del-mark': '#a75452',
+      'tok-k': '#4a4a6a', 'tok-s': '#6b5330', 'tok-c': '#6b6b6b',
+      'tok-n': '#3f5f5f', 'tok-y': '#3c6b8f', 'tok-key': '#3c6b8f',
+      'tok-f': '#6a6038',
+    },
+    dark: {
+      ground: '#1a1a1a', surface: '#212121', sunk: '#272727', rule: '#383838', filler: '#1d1d1d',
+      ink: '#e8e8e8', 'ink-soft': '#a8a8a8', 'ink-faint': '#787878',
+      accent: '#89b4d4', 'accent-soft': '#20303a',
+      'add-bg': '#1d2a20', 'add-ink': '#d4e4d8', 'add-mark': '#5f9c70',
+      'del-bg': '#2e2020', 'del-ink': '#eed7d5', 'del-mark': '#c07a78',
+      'tok-k': '#b0b0d8', 'tok-s': '#d6bb8e', 'tok-c': '#a6a6a6',
+      'tok-n': '#8fc4c4', 'tok-y': '#89b4d4', 'tok-key': '#89b4d4',
+      'tok-f': '#cabf9a',
+    },
+  },
+  parchment: {
+    label: 'Parchment',
+    light: {
+      ground: '#faf8f3', surface: '#fffefb', sunk: '#f2efe6', rule: '#e0dbcd', filler: '#f5f2ea',
+      ink: '#221f18', 'ink-soft': '#5f5a4c', 'ink-faint': '#8f8878',
+      accent: '#1f6a63', 'accent-soft': '#e6f0ee',
+      'add-bg': '#e8f1e4', 'add-ink': '#22331a', 'add-mark': '#4a7c3a',
+      'del-bg': '#f8e9e2', 'del-ink': '#3b2019', 'del-mark': '#a9553e',
+      'tok-k': '#7a4a86', 'tok-s': '#8c5321', 'tok-c': '#6f6858',
+      'tok-n': '#2a6a5c', 'tok-y': '#1f6a63', 'tok-key': '#2f5e86',
+      'tok-f': '#855f18',
+    },
+    dark: {
+      ground: '#1a1814', surface: '#211e19', sunk: '#282420', rule: '#39342c', filler: '#1d1b17',
+      ink: '#ece7dc', 'ink-soft': '#a8a191', 'ink-faint': '#7a7365',
+      accent: '#6fc0b3', 'accent-soft': '#1f2f2c',
+      'add-bg': '#1f2a1b', 'add-ink': '#d9e6d2', 'add-mark': '#6fa05c',
+      'del-bg': '#2f211b', 'del-ink': '#efd9cf', 'del-mark': '#c47e63',
+      'tok-k': '#d0a0dc', 'tok-s': '#e2b07a', 'tok-c': '#a79f8e',
+      'tok-n': '#7fc9b8', 'tok-y': '#6fc0b3', 'tok-key': '#8fb6dc',
+      'tok-f': '#dbc07a',
+    },
+  },
+  oxide: {
+    label: 'Oxide',
+    light: {
+      ground: '#f6f7f9', surface: '#ffffff', sunk: '#eceef2', rule: '#d9dde4', filler: '#f1f3f6',
+      ink: '#10151c', 'ink-soft': '#4e5665', 'ink-faint': '#828b9b',
+      accent: '#b4552d', 'accent-soft': '#f7ece6',
+      'add-bg': '#e3f0ea', 'add-ink': '#123227', 'add-mark': '#1f7a5c',
+      'del-bg': '#f9e8e6', 'del-ink': '#39191a', 'del-mark': '#b1443f',
+      'tok-k': '#1f5fa9', 'tok-s': '#7a4a1c', 'tok-c': '#636c7c',
+      'tok-n': '#7a2f7a', 'tok-y': '#0f6b63', 'tok-key': '#b4552d',
+      'tok-f': '#8a5b00',
+    },
+    dark: {
+      ground: '#101318', surface: '#161a20', sunk: '#1c2128', rule: '#2a313b', filler: '#131720',
+      ink: '#e4e8ef', 'ink-soft': '#9aa3b2', 'ink-faint': '#69727f',
+      accent: '#e8865a', 'accent-soft': '#2a1e18',
+      'add-bg': '#13291f', 'add-ink': '#cde7da', 'add-mark': '#3f9b76',
+      'del-bg': '#2b1a1a', 'del-ink': '#f2d6d3', 'del-mark': '#cf6a64',
+      'tok-k': '#7fb2ef', 'tok-s': '#d9a978', 'tok-c': '#909aa8',
+      'tok-n': '#d08fd0', 'tok-y': '#5fc3b8', 'tok-key': '#e8865a',
+      'tok-f': '#e3bd72',
+    },
+  },
+  'oxide-hard': {
+    label: 'Oxide Hard',
+    light: {
+      ground: '#ffffff', surface: '#ffffff', sunk: '#eeeff1', rule: '#c6cad1', filler: '#f6f7f8',
+      ink: '#000000', 'ink-soft': '#353a42', 'ink-faint': '#676d77',
+      accent: '#c2410c', 'accent-soft': '#fdeee6',
+      'add-bg': '#dbf5e4', 'add-ink': '#000000', 'add-mark': '#0b7a3b',
+      'del-bg': '#ffe0de', 'del-ink': '#000000', 'del-mark': '#c0302b',
+      'tok-k': '#0b46cc', 'tok-s': '#8f4400', 'tok-c': '#454b54',
+      'tok-n': '#a3008f', 'tok-y': '#00675e', 'tok-key': '#c2410c',
+      'tok-f': '#7a5200',
+    },
+    dark: {
+      ground: '#000000', surface: '#08080a', sunk: '#121216', rule: '#32323a', filler: '#050507',
+      ink: '#ffffff', 'ink-soft': '#ced2da', 'ink-faint': '#8b919c',
+      accent: '#ff7a45', 'accent-soft': '#2b1308',
+      'add-bg': '#0a2a17', 'add-ink': '#ffffff', 'add-mark': '#2fd178',
+      'del-bg': '#300e0f', 'del-ink': '#ffffff', 'del-mark': '#ff6b65',
+      'tok-k': '#6db3ff', 'tok-s': '#ffb86c', 'tok-c': '#aeb7c4',
+      'tok-n': '#ff8ae2', 'tok-y': '#3fe0cd', 'tok-key': '#ff7a45',
+      'tok-f': '#ffd479',
+    },
+  },
+};
+
+const DEFAULT_THEME = 'oxide-hard';
+
+const vars = (palette, indent) =>
+  Object.entries(palette)
+    .map(([name, value]) => `${indent}--${name}: ${value};`)
+    .join('\n');
+
+function themeCss() {
+  const blocks = [`:root {\n${vars(THEMES[DEFAULT_THEME].light, '  ')}\n}`];
+
+  for (const [id, theme] of Object.entries(THEMES)) {
+    blocks.push(`.shell[data-skin="${id}"] {\n${vars(theme.light, '  ')}\n}`);
+    blocks.push(
+      `@media (prefers-color-scheme: dark) {\n  :root:not([data-theme="light"]) .shell[data-skin="${id}"] {\n${vars(
+        theme.dark,
+        '    '
+      )}\n  }\n}`
+    );
+    blocks.push(`:root[data-theme="dark"] .shell[data-skin="${id}"] {\n${vars(theme.dark, '  ')}\n}`);
+  }
+
+  blocks.push(
+    `@media (prefers-color-scheme: dark) {\n  :root:not([data-theme="light"]) {\n${vars(
+      THEMES[DEFAULT_THEME].dark,
+      '    '
+    )}\n  }\n}`,
+    `:root[data-theme="dark"] {\n${vars(THEMES[DEFAULT_THEME].dark, '  ')}\n}`
+  );
+
+  return blocks.join('\n');
+}
+
+const skinOptions = Object.entries(THEMES)
+  .map(([id, theme]) => `<option value="${id}">${theme.label}</option>`)
+  .join('');
+
 const meta = notes.pr ?? {};
 const totals = files.reduce((a, f) => ({ added: a.added + f.added, removed: a.removed + f.removed }), { added: 0, removed: 0 });
 
 const html = `<title>${esc(meta.title ? `${meta.repo ?? ''} #${meta.number} walkthrough` : 'PR walkthrough')}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap">
 <style>
+${themeCss()}
 :root {
-  --ground: #fbfbfc;
-  --surface: #ffffff;
-  --sunk: #f3f4f7;
-  --rule: #e2e4ea;
-  --ink: #16181d;
-  --ink-soft: #5b616f;
-  --ink-faint: #8b91a0;
-  --accent: #1f5fa9;
-  --accent-soft: #eaf1f9;
-  --add-bg: #e9f4ec;
-  --add-ink: #1b3a25;
-  --add-mark: #2f7d46;
-  --del-bg: #fdeceb;
-  --del-ink: #3d1a19;
-  --del-mark: #b3403f;
-  --filler: #f7f8fa;
-  --tok-k: #8250a8;
-  --tok-s: #a04a1e;
-  --tok-c: #6d7686;
-  --tok-n: #10656b;
-  --tok-y: #1f5fa9;
-  --tok-key: #1b4f8a;
   --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --serif: "IBM Plex Serif", Georgia, serif;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ground: #131519;
-    --surface: #181b21;
-    --sunk: #1e222a;
-    --rule: #2b3039;
-    --ink: #e7e9ee;
-    --ink-soft: #a2a9b8;
-    --ink-faint: #6f7787;
-    --accent: #7fb2ef;
-    --accent-soft: #1b2735;
-    --add-bg: #16281c;
-    --add-ink: #cfe8d6;
-    --add-mark: #4c9a64;
-    --del-bg: #2c1a1a;
-    --del-ink: #f0d4d2;
-    --del-mark: #cd6260;
-    --filler: #15181d;
-  --tok-k: #cba0ec;
-  --tok-s: #e8a877;
-  --tok-c: #8d95a6;
-  --tok-n: #63cdc2;
-  --tok-y: #86b6ef;
-  --tok-key: #9dc6f5;
-    --tok-k: #cba0ec;
-    --tok-s: #e8a877;
-    --tok-c: #8d95a6;
-    --tok-n: #63cdc2;
-    --tok-y: #86b6ef;
-    --tok-key: #9dc6f5;
-  }
-}
-:root[data-theme="dark"] {
-  --ground: #131519;
-  --surface: #181b21;
-  --sunk: #1e222a;
-  --rule: #2b3039;
-  --ink: #e7e9ee;
-  --ink-soft: #a2a9b8;
-  --ink-faint: #6f7787;
-  --accent: #7fb2ef;
-  --accent-soft: #1b2735;
-  --add-bg: #16281c;
-  --add-ink: #cfe8d6;
-  --add-mark: #4c9a64;
-  --del-bg: #2c1a1a;
-  --del-ink: #f0d4d2;
-  --del-mark: #cd6260;
-  --filler: #15181d;
 }
 
 * { box-sizing: border-box; }
@@ -485,7 +569,7 @@ body {
 a { color: var(--accent); }
 code { font-family: var(--mono); }
 
-.shell { display: grid; grid-template-columns: 1fr; gap: 0; width: 100%; }
+.shell { display: grid; grid-template-columns: 1fr; gap: 0; width: 100%; min-height: 100vh; background: var(--ground); color: var(--ink); }
 @media (min-width: 1100px) {
   .shell { grid-template-columns: 15rem minmax(0, 1fr); align-items: start; }
 }
@@ -598,10 +682,11 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 
 .t-k { color: var(--tok-k); }
 .t-s { color: var(--tok-s); }
-.t-c { color: var(--tok-c); font-style: italic; }
+.t-c { color: var(--tok-c); }
 .t-n { color: var(--tok-n); }
 .t-y { color: var(--tok-y); }
 .t-key { color: var(--tok-key); }
+.t-f { color: var(--tok-f); }
 .hunk + .hunk .code { border-top: 1px solid var(--rule); }
 
 .toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.85rem; }
@@ -614,6 +699,13 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 .seg button + button { border-left: 1px solid var(--rule); }
 .seg button.on { background: var(--accent); color: var(--surface); }
 .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.skin { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--ink-faint); }
+.skin select {
+  font-family: var(--sans); font-size: 0.78rem; padding: 0.28rem 0.4rem;
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--surface); color: var(--ink);
+}
+.skin select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .hunk-bar {
   display: flex; gap: 1rem; padding: 0.3rem 0.6rem;
   background: var(--sunk); color: var(--ink-faint);
@@ -622,7 +714,7 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 .hunk-ctx { color: var(--ink-soft); }
 .row { display: grid; grid-template-columns: 2.9rem 2.9rem minmax(0, 1fr); align-items: baseline; }
 .row code {
-  font-size: 0.8rem; line-height: 1.5; white-space: pre; padding-right: 0.5rem;
+  font-size: 0.8rem; line-height: 1.5; white-space: pre; padding-right: 0.5rem; font-weight: 500;
   color: var(--ink);
 }
 .ln {
@@ -656,7 +748,7 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 
-<div class="shell" data-view="split">
+<div class="shell" data-view="split" data-skin="${DEFAULT_THEME}">
   <nav class="rail">
     <div class="rail-head">
       <h2>Reading order</h2>
@@ -677,7 +769,7 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
       <div class="why"><h3>Why</h3>${paragraphs(notes.why)}</div>
       ${meta.url ? `<p class="totals"><a href="${esc(meta.url)}">${esc(meta.url)}</a></p>` : ''}
     </header>
-    <div class="toolbar"><div class="seg" role="group" aria-label="Diff view"><button type="button" data-set="split">Side by side</button><button type="button" data-set="unified">Unified</button></div></div>
+    <div class="toolbar"><div class="seg" role="group" aria-label="Diff view"><button type="button" data-set="split">Side by side</button><button type="button" data-set="unified">Unified</button></div><label class="skin"><span>Theme</span><select id="skin">${skinOptions}</select></label></div>
     ${fileHtml}
   </main>
 </div>
@@ -700,6 +792,17 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
     });
   });
   sync();
+
+  var skin = document.getElementById('skin');
+  try {
+    var savedSkin = localStorage.getItem('pr-walkthrough-skin');
+    if (savedSkin && skin.querySelector('option[value="' + savedSkin + '"]')) shell.dataset.skin = savedSkin;
+  } catch (e) {}
+  skin.value = shell.dataset.skin;
+  skin.addEventListener('change', function () {
+    shell.dataset.skin = skin.value;
+    try { localStorage.setItem('pr-walkthrough-skin', skin.value); } catch (e) {}
+  });
 
   var rail = document.querySelector('.rail-toggle');
   function railState(closed) {

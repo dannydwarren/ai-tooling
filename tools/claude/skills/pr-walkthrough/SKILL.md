@@ -152,7 +152,8 @@ You do not hand-write HTML, and you do not need to describe the page in chat —
 - Side-by-side by default with a unified toggle; horizontal scroll is synced across a file's
   segments. New and deleted files render one pane, not two.
 - Syntax highlighting for C#, TS/JS, JSON, HCL, YAML, shell, SQL, Python, Go, CSS and XML-family
-  files, by extension.
+  files, by extension — keywords, strings, comments, numbers, types and call sites.
+- Five palettes in a Theme picker, each defined for light and dark; the reader's choice persists.
 - A reading-order rail, collapsible, listing every titled note.
 - The note gutter is always reserved, so code width never changes down a file.
 
