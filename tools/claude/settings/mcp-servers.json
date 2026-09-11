@@ -4,26 +4,6 @@
     "datadog": {
       "type": "http",
       "url": "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp"
-    },
-    "snowflake": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": [
-        "snowflake-labs-mcp",
-        "--account",
-        "{{SNOWFLAKE_ACCOUNT}}",
-        "--user",
-        "{{USER_EMAIL}}",
-        "--private-key-file",
-        "{{USER_HOME_JSON}}\\.snowflake\\rsa_key.p8",
-        "--warehouse",
-        "GENERAL_WH",
-        "--database",
-        "STAGING",
-        "--schema",
-        "CORE"
-      ],
-      "env": {}
     }
   }
 }

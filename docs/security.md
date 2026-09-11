@@ -99,6 +99,17 @@ instead of a judgement call.
 Values shorter than six characters are ignored, since matching those produces noise rather than
 signal.
 
+**A value does not need a placeholder to be useful.** The two roles are separate: templating
+substitutes a value on the way in and out, while detection fails the build if the literal ever
+appears. A string with no `{{PLACEHOLDER}}` anywhere still gets a `secret`-severity rule, so it is
+worth keeping entries in the values file for things you simply never want committed — a work email,
+an account identifier, an internal hostname — whether or not any file templates them.
+
+`security/required-values.json` declares only the keys the repo **templates**, because that is what
+the build needs in order to recognise a placeholder on a machine with no values file. Detection-only
+entries belong in the values file and nowhere else. Removing something from the templated set is
+therefore not a reason to remove it from the values file; the guard is usually still worth having.
+
 ## The allowlist
 
 [../security/allowlist.json](../security/allowlist.json) suppresses known-acceptable findings. An
