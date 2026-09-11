@@ -411,3 +411,19 @@ test('a server with nothing sensitive is backed up unchanged', async () => {
   assert.ok(!hasInlineSecret({}));
   assert.ok(!hasInlineSecret({ args: ['--warehouse', 'GENERAL_WH', '--schema', 'CORE'] }));
 });
+
+test('the build warns about a missing pre-push guard, and stays quiet on CI', async () => {
+  const fs = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const hookDir = execFileSync('git', ['rev-parse', '--git-path', 'hooks'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+  const hook = path.resolve(REPO_ROOT, hookDir, 'pre-push');
+
+  const source = fs.readFileSync(path.join(REPO_ROOT, 'scripts', 'build.mjs'), 'utf8');
+  assert.match(source, /process\.env\.CI/, 'the warning must be suppressed on a runner');
+  assert.match(source, /install-git-hooks/, 'the warning must name the command that fixes it');
+  assert.match(source, /managed by ai-tooling/, 'it must recognise only the hook this repo wrote');
+
+  if (fs.existsSync(hook)) {
+    assert.match(fs.readFileSync(hook, 'utf8'), /scripts\/build\.mjs/, 'the installed guard must run the build');
+  }
+});

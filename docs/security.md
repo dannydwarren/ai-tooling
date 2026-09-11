@@ -165,6 +165,15 @@ npm run install-git-hooks
 That adds a `pre-push` hook running `npm run build`, which refuses the push on any secret-severity
 finding — including a leaked private value.
 
+**Be clear about how strong that guard is.** Git hooks live in `.git/hooks/`, which is never cloned,
+so a fresh clone has no guard until you run that command. To stop it being silently absent, the
+build itself warns when the hook is missing — so the thing you run regularly tells you the guard is
+not there. The warning is suppressed when `CI` is set, since a runner neither has nor needs it.
+
+It is a convention, not a control. `git push --no-verify` bypasses it, deliberately, and anyone with
+push access who never runs the build is unguarded. Treat it as the thing that catches honest
+mistakes, which is what it is, rather than something that makes a leak impossible.
+
 **PII never fails CI.** `build.yml` runs the normal build (PII reports, does not fail) plus a strict
 pass with `continue-on-error: true`. That is deliberate — see the two-severities section — but it
 means the literal reading of "never reveal PII" is enforced by review and the local strict run, not
