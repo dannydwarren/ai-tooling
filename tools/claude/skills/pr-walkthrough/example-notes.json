@@ -81,7 +81,7 @@
       "file": "Api/Validation/MarkupDetector.cs",
       "line": 49,
       "title": "What this refuses, and what it does not",
-      "text": "A tag start is `<` followed by a letter, `/`, `!` or `?`. So `Contact <bob@acme.com> for access` and `Replace <front> window` are refused, while `5 < 10` and `Apt <5>` pass.\n\nThe PR states that cost is accepted and not measured: no counter is emitted, and the log carries a field count with nothing to divide it by. It also lists what passes by design — `javascript:`, `data:text/html`, attribute breakouts, and fullwidth `＜script＞`."
+      "text": "A tag start is `<` followed by a letter, `/`, `!` or `?`. So `Replace <front> window` and `a </ b` are refused, while `5 < 10` and `Apt <5>` pass.\n\nThe PR states that cost is accepted and not measured: no counter is emitted, and the log carries a field count with nothing to divide it by. It also lists what passes by design — `javascript:`, `data:text/html`, attribute breakouts, and fullwidth `＜script＞`."
     },
     {
       "file": "Api/Validation/MarkupDetector.cs",
