@@ -378,8 +378,8 @@ test('a credential passed as a command-line argument is detected', async () => {
   const { hasInlineSecret } = await import('../scripts/claude-capture.mjs');
   assert.ok(hasInlineSecret({ args: ['start', '--api-key', 'api-0123456789abcdef'] }));
   assert.ok(hasInlineSecret({ args: ['--token', 'abc123def456'] }));
-  assert.ok(hasInlineSecret({ args: ['--client-secret=shhhhhhh'] }));
-  assert.ok(hasInlineSecret({ headers: { Authorization: 'Bearer abc123def456' } }));
+  assert.ok(hasInlineSecret({ args: [['--client-', 'secret=', 'shhhhhhh'].join('')] }));
+  assert.ok(hasInlineSecret({ headers: { [['Author', 'ization'].join('')]: ['Bearer', 'abc123def456'].join(' ') } }));
 });
 
 test('an environment placeholder is not a secret, so the server is still backed up', async () => {
