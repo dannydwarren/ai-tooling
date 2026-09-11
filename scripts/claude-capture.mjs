@@ -57,9 +57,31 @@ export function mcpBackup(servers) {
   };
 }
 
+const CREDENTIAL_FLAG = /^--?(?:api[-_]?key|apikey|token|secret|password|passwd|pwd|auth|auth[-_]?token|access[-_]?token|client[-_]?secret|private[-_]?key)$/i;
+const CREDENTIAL_ASSIGNMENT = /^--?[A-Za-z0-9-]*(?:key|token|secret|password|auth)=(.*)$/i;
+
+export function isLiteralValue(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^\$\{[^}]+\}$/.test(trimmed)) return false;
+  if (/^\$[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) return false;
+  if (/^\{\{[^}]+\}\}$/.test(trimmed)) return false;
+  return true;
+}
+
 export function hasInlineSecret(server) {
-  const env = server?.env ?? {};
-  return Object.values(env).some((v) => typeof v === 'string' && v.trim().length > 0);
+  if (Object.values(server?.env ?? {}).some(isLiteralValue)) return true;
+  if (Object.values(server?.headers ?? {}).some(isLiteralValue)) return true;
+
+  const args = Array.isArray(server?.args) ? server.args : [];
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = String(args[i] ?? '');
+    if (CREDENTIAL_FLAG.test(arg) && isLiteralValue(args[i + 1]) && !/[\\/]/.test(String(args[i + 1]))) return true;
+    const inline = CREDENTIAL_ASSIGNMENT.exec(arg);
+    if (inline && isLiteralValue(inline[1]) && !/[\\/]/.test(inline[1])) return true;
+  }
+  return false;
 }
 
 export function plan() {

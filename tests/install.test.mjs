@@ -373,3 +373,41 @@ test('the pre-push hook runs the build and can be bypassed', async () => {
   assert.match(PRE_PUSH, /--no-verify/);
   assert.match(PRE_PUSH, /exit 1/);
 });
+
+test('a credential passed as a command-line argument is detected', async () => {
+  const { hasInlineSecret } = await import('../scripts/claude-capture.mjs');
+  assert.ok(hasInlineSecret({ args: ['start', '--api-key', 'api-0123456789abcdef'] }));
+  assert.ok(hasInlineSecret({ args: ['--token', 'abc123def456'] }));
+  assert.ok(hasInlineSecret({ args: ['--client-secret=shhhhhhh'] }));
+  assert.ok(hasInlineSecret({ headers: { Authorization: 'Bearer abc123def456' } }));
+});
+
+test('an environment placeholder is not a secret, so the server is still backed up', async () => {
+  const { hasInlineSecret, isLiteralValue } = await import('../scripts/claude-capture.mjs');
+  assert.ok(!hasInlineSecret({ args: ['--api-key', '${LAUNCHDARKLY_API_KEY}'] }));
+  assert.ok(!hasInlineSecret({ env: { TOKEN: '${MY_TOKEN}' } }));
+  assert.ok(!hasInlineSecret({ env: { TOKEN: '$MY_TOKEN' } }));
+  assert.ok(!hasInlineSecret({ args: ['--token', '{{PLACEHOLDER}}'] }));
+
+  assert.ok(!isLiteralValue('${VAR}'));
+  assert.ok(!isLiteralValue('$VAR'));
+  assert.ok(!isLiteralValue('{{X}}'));
+  assert.ok(!isLiteralValue('   '));
+  assert.ok(isLiteralValue('actual-value'));
+});
+
+test('a path argument is not mistaken for a credential', async () => {
+  const { hasInlineSecret } = await import('../scripts/claude-capture.mjs');
+  assert.ok(
+    !hasInlineSecret({ args: ['--private-key-file', 'C:\Users\Me\.snowflake\rsa_key.p8'] }),
+    'a path points at a secret, it is not one, and templating already covers the home prefix',
+  );
+  assert.ok(!hasInlineSecret({ args: ['--key', '/etc/ssl/key.pem'] }));
+});
+
+test('a server with nothing sensitive is backed up unchanged', async () => {
+  const { hasInlineSecret } = await import('../scripts/claude-capture.mjs');
+  assert.ok(!hasInlineSecret({ type: 'http', url: 'https://mcp.example.com/mcp' }));
+  assert.ok(!hasInlineSecret({}));
+  assert.ok(!hasInlineSecret({ args: ['--warehouse', 'GENERAL_WH', '--schema', 'CORE'] }));
+});
