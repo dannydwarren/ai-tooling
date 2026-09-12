@@ -2,13 +2,21 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+export function normalizeDrive(p) {
+  return /^[a-z]:/.test(p) ? p[0].toUpperCase() + p.slice(1) : p;
+}
 
-export const USER_HOME = os.homedir();
+export const REPO_ROOT = normalizeDrive(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'),
+);
 
-export const CLAUDE_HOME = process.env.CLAUDE_CONFIG_DIR
-  ? path.resolve(process.env.CLAUDE_CONFIG_DIR)
-  : path.join(USER_HOME, '.claude');
+export const USER_HOME = normalizeDrive(os.homedir());
+
+export const CLAUDE_HOME = normalizeDrive(
+  process.env.CLAUDE_CONFIG_DIR
+    ? path.resolve(process.env.CLAUDE_CONFIG_DIR)
+    : path.join(USER_HOME, '.claude'),
+);
 
 export const VALUES_FILE = process.env.AI_TOOLING_VALUES
   ? path.resolve(process.env.AI_TOOLING_VALUES)

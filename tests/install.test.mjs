@@ -400,3 +400,27 @@ test('a server with nothing sensitive is backed up unchanged', async () => {
   assert.ok(!hasInlineSecret({ args: ['--warehouse', 'GENERAL_WH', '--schema', 'CORE'] }));
 });
 
+
+test('the drive letter is normalised, so the same path is written the same way', async () => {
+  const { normalizeDrive, REPO_ROOT, USER_HOME, CLAUDE_HOME } = await import('../scripts/lib/paths.mjs');
+
+  assert.equal(normalizeDrive('c:\src\ai-tooling'), 'C:\src\ai-tooling');
+  assert.equal(normalizeDrive('C:\src\ai-tooling'), 'C:\src\ai-tooling');
+  assert.equal(normalizeDrive('d:/other'), 'D:/other');
+  assert.equal(normalizeDrive('/home/user/repo'), '/home/user/repo', 'POSIX paths are untouched');
+  assert.equal(normalizeDrive(''), '');
+
+  for (const [label, value] of [['REPO_ROOT', REPO_ROOT], ['USER_HOME', USER_HOME], ['CLAUDE_HOME', CLAUDE_HOME]]) {
+    if (/^[A-Za-z]:/.test(value)) {
+      assert.match(value, /^[A-Z]:/, `${label} must expose an upper-case drive letter`);
+    }
+  }
+});
+
+test('a hook command differing only in drive-letter case is recognised as ours', async () => {
+  const lower = `node "${toSlash(REPO_ROOT).replace(/^C:/, 'c:')}/tools/claude/hooks/skill-audit.mjs"`;
+  assert.ok(
+    isManagedCommand(lower),
+    'cwd casing varies by how the script was launched; ownership must not depend on it',
+  );
+});
