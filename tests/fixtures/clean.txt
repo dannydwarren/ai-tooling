@@ -9,3 +9,6 @@ A templated value: token = "{{SOME_PLACEHOLDER}}"
 A relative path: ./tools/claude/hooks/no-comments.mjs
 A short hex string: deadbeef
 Version numbers: 1.2.3 and 2026.09.09
+A credential-named variable assigned a call, not a literal: const secret = passphrase();
+The same with a member access: const apiKey = config.credentials;
+And with arguments: password = readSecret(file, options);

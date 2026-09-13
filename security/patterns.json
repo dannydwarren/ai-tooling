@@ -72,7 +72,7 @@
       "id": "assigned-credential",
       "severity": "secret",
       "title": "Credential assigned to a variable or key, quoted or bare",
-      "pattern": "(?i)(?:password|passwd|pwd|secret|client_secret|access_token|refresh_token|api[_-]?key|apikey|auth[_-]?token)[\"']?\\s*[:=]\\s*[\"']?(?!process\\.env|os\\.environ|null|undefined|true|false)[^\\s\"',;${}<>/([{=]{1}[^\\s\"',;${}<>]{7,}"
+      "pattern": "(?i)(?:password|passwd|pwd|secret|client_secret|access_token|refresh_token|api[_-]?key|apikey|auth[_-]?token)[\"']?\\s*[:=]\\s*[\"']?(?!process\\.env|os\\.environ|null|undefined|true|false)(?![A-Za-z_$][A-Za-z0-9_$]*\\s*[(.])[^\\s\"',;${}<>/([{=]{1}[^\\s\"',;${}<>]{7,}"
     },
     {
       "id": "connection-string",

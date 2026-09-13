@@ -6,6 +6,7 @@ const STEPS = [
   { name: 'json', script: 'scripts/checks/validate-json.mjs' },
   { name: 'assets', script: 'scripts/checks/validate-assets.mjs' },
   { name: 'links', script: 'scripts/checks/validate-links.mjs' },
+  { name: 'memory', script: 'scripts/checks/validate-memory.mjs' },
   { name: 'scan', script: 'scripts/checks/scan.mjs' },
   { name: 'test', node: ['--test', 'tests/**/*.test.mjs'] },
 ];

@@ -437,6 +437,11 @@ tmp/*
 .claude/scheduled_tasks.lock
 .worktrees
 
+# ai-tooling: plaintext Claude auto-memory is NEVER committed.
+# It records employer architecture and assessments of named job candidates.
+# Only the encrypted bundle (tools/claude/memory.sealed.json) ships.
+tools/claude/memory/
+
 # ai-tooling: never commit captured machine state or credentials
 **/.credentials.json
 **/*.credentials.json
