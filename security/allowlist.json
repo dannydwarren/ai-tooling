@@ -2,6 +2,12 @@
   "note": "Accepted findings from scripts/checks/scan.mjs. Every entry needs a written reason. An entry matches when all of its present fields match a finding: `file` (glob, repo-relative, forward slashes), `rule` (rule id from security/patterns.json), `fingerprint` (from the scan report). Prefer the narrowest entry that works. Allowlisting a `secret`-severity rule should be rare and is a deliberate decision. See docs/security.md.",
   "entries": [
     {
+      "file": "tools/claude/skills/jncore-monolith-docker-test/scripts/jnm.sh",
+      "rule": "assigned-credential",
+      "fingerprint": "bb7fcae4a6c358ea",
+      "reason": "Overridable default admin password for a throwaway local Couchbase container that publishes no host ports; it is Couchbase's standard dev default, not a real credential."
+    },
+    {
       "file": "docs/claude/hooks.md",
       "rule": "posix-user-path",
       "reason": "Hook documentation quotes example command strings from the official Claude Code docs, which use generic /home/user paths."
