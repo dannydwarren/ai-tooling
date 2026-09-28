@@ -147,6 +147,7 @@ Backing up `~/.claude` wholesale would be a serious mistake. These were reviewed
 | `~/.claude/projects/` | Full session transcripts, containing work code |
 | `~/.claude/file-history/` | Edit snapshots of work source files |
 | `~/.claude/plugins/cache`, `marketplaces/` | Regenerable, and includes employer plugin source |
+| `~/.claude/skills/synced/` | Anthropic skills synced from the account (docx, pdf, xlsx, ...). Claude manages them, so capture skips them and install never reports them as orphans; see `scripts/lib/unmanaged.mjs` |
 
 Only four things are copied in: `CLAUDE.md`, `settings.json`, `skills/` and `commands/`. That is an
 allowlist, not a denylist, which is the right shape for this problem — a new file appearing in
