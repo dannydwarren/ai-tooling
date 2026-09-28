@@ -28,6 +28,7 @@ one script. Do not run `yarn`, `npx mocha` or `node` for this repo on the host.
 | `bash $J down <wt> [--couchbase]` | Removes the worktree container, and optionally Couchbase. Package sets are kept. |
 | `bash $J couchbase` | Starts and initialises `jnm-couchbase` on its own (buckets `main`, `state`, `tmp`). |
 | `bash $J status` | Containers, plus package sets in use and unused. |
+| `bash $J timings [n]` | The last `n` commands (default 15) and runs / fails / avg / last / max per command and per step, across every session. |
 | `bash $J prune` | Deletes package sets no container uses. Run it now and then to reclaim disk. |
 
 `<wt>` is the worktree path, for example `C:/src/jncore-monolith-arch-2280`. `/c/src/...` works too.
@@ -42,6 +43,24 @@ Typical session:
     bash $J down C:/src/jncore-monolith-arch-2280
 
 Full-suite runs are fine in this repo.
+
+## Reporting timings to Danny (required)
+
+Danny uses these timings to judge whether the skill is working well or needs changing. Every command
+prints `[jnm] <step>: <time>` lines on stderr as it goes and ends with
+`[jnm] total: <command> took <time> (exit N)`. Every line is also appended to the timings log
+(`{{REPO_ROOT_SLASH}}/tmp/logs/jnm-timings.tsv`, override with `JNM_TIMINGS_LOG`).
+
+- **After every jnm command,** tell Danny the total and any step that took a noticeable share of it,
+  in one short line. For example: "`test api (specs)`: 8s (check 1s, run 5s)." Don't drop these
+  lines when you summarise the test output.
+- **Compare against the Timings table below.** If a command or step takes more than about twice its
+  expected time, say so plainly, name the step, and suggest a likely cause. A first run after the
+  machine or Docker has been idle is often slow once (a cold file cache): a 17s spec took 1m28s the
+  first time after a weekend. Run it again before calling it a regression.
+- **When Danny asks how the skill is doing** (or at the end of a session that used it heavily), run
+  `bash $J timings` and summarise the trend: what got slower, what failed, which step dominates.
+- Never let a timing line hide a failure. The exit code and pass/fail summary come first.
 
 ## How installs are shared
 
@@ -115,21 +134,26 @@ For a "does this fail without the fix" check: revert the jncore change, run `tes
 | `JNM_COUCHBASE` | `jnm-couchbase` |
 | `JNM_COUCHBASE_IMAGE` | `couchbase/server:enterprise-7.6.6` |
 | `JNM_YARN_CACHE` | `jnm-yarn-cache` |
+| `JNM_TIMINGS_LOG` | `{{REPO_ROOT_SLASH}}/tmp/logs/jnm-timings.tsv` |
 | `CB_USERNAME` / `CB_PASSWORD` | `Administrator` / `password` |
 
 ## Timings
 
-Measured on this machine (Snapdragon X, Docker Desktop), 2026-09-25:
+Measured on this machine (Snapdragon X, Docker Desktop), 2026-09-25 to 2026-09-28. These are the
+expected values to compare `[jnm]` lines against.
 
-| Step | Time | How often |
+| Command / step | Expected | How often |
 |---|---|---|
-| First `up` on the machine (all 10 package sets) | ~6 min per run, one run hit 27 min on a single package | Once per machine |
-| `up` for another worktree with the same dependencies | ~20s | Once per worktree |
-| `up` when a branch changed one package's dependencies | ~1 min for that package | Per dependency change |
-| First `--couchbase` (create and initialise) | ~1 min | Once per machine |
-| One spec file | ~20s | Every run |
+| First `up` on the machine (all 10 package sets) | ~6 min (one run hit 27 min on a single package) | Once per machine |
+| `up` for a new worktree with the same dependencies | ~20–30s | Once per worktree |
+| `up` for a worktree already up | ~10s | Any time |
+| `up > check package sets` | ~1s | Every `up` |
+| `up > install <pkg>` | 20–70s per package | Per dependency change |
+| `up > couchbase`, already running / first create | ~6s / ~1 min | Every `up --couchbase` |
+| `check container` (start of test/lint/harness) | ~1s | Every command |
+| One spec file (`test <pkg> <spec>`) | ~8–20s | Every run |
 | Full test suite (9 packages, 3,407 tests) | ~3.5 min | Every run |
-| Full lint | ~1.5 min | Every run |
+| Full lint | ~45s | Every run |
 | Outbox harness against Couchbase | ~70s | Every run |
 
 For comparison, installing into a per-worktree `node_modules` took 13–15 min per worktree on Docker
