@@ -38,7 +38,8 @@
       "source": {
         "source": "file",
         "path": "C:\\src\\{{WORK_MARKETPLACE_REPO}}\\.claude-plugin\\marketplace.json"
-      }
+      },
+      "autoUpdate": true
     }
   },
   "skipDangerousModePermissionPrompt": true,
