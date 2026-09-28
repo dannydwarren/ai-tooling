@@ -4,6 +4,7 @@ import path from 'node:path';
 import { CLAUDE_HOME, REPO_ROOT, VALUES_FILE, repoPath, isMain, toSlash } from './lib/paths.mjs';
 import { loadValues, render, renderDeep, placeholdersIn, requiredValueKeys } from './lib/template.mjs';
 import { relFiles, readText, writeText, readJson, writeJson, backup, sameText } from './lib/fsx.mjs';
+import { isUnmanaged } from './lib/unmanaged.mjs';
 
 const SOURCE = repoPath('tools', 'claude');
 const HOOKS_DIR = toSlash(path.join(SOURCE, 'hooks')).toLowerCase();
@@ -40,6 +41,7 @@ export function orphans(planned) {
     const root = path.join(CLAUDE_HOME, dir);
     if (!fs.existsSync(root)) continue;
     for (const rel of relFiles(root)) {
+      if (isUnmanaged(dir, rel)) continue;
       const abs = path.join(root, rel.split('/').join(path.sep));
       if (!expected.has(path.resolve(abs).toLowerCase())) found.push(abs);
     }

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { CLAUDE_HOME, REPO_ROOT, USER_HOME, VALUES_FILE, repoPath, isMain } from './lib/paths.mjs';
 import { loadValues, loadPrivateValues, derivedValues, unrender } from './lib/template.mjs';
 import { relFiles, readText, writeText, sameText } from './lib/fsx.mjs';
+import { isUnmanaged } from './lib/unmanaged.mjs';
 import { stripManaged } from './claude-install.mjs';
 
 const TARGET = repoPath('tools', 'claude');
@@ -125,7 +126,7 @@ export function plan() {
   for (const item of CONTENT) {
     const src = path.join(CLAUDE_HOME, item.from);
     if (!fs.existsSync(src)) continue;
-    const rels = item.kind === 'dir' ? relFiles(src) : [''];
+    const rels = item.kind === 'dir' ? relFiles(src).filter((rel) => !isUnmanaged(item.from, rel)) : [''];
     for (const rel of rels) {
       const srcFile = rel ? path.join(src, rel) : src;
       const destFile = rel ? path.join(TARGET, item.to, rel) : path.join(TARGET, item.to);

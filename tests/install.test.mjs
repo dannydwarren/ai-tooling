@@ -341,6 +341,48 @@ test('orphans finds machine files the repo no longer tracks', async () => {
   assert.ok(found.every((f) => typeof f === 'string'));
 });
 
+test('isUnmanaged matches Claude-synced skills and nothing else', async () => {
+  const { isUnmanaged } = await import('../scripts/lib/unmanaged.mjs');
+  assert.ok(isUnmanaged('skills', 'synced/abc_def/xlsx/SKILL.md'));
+  assert.ok(isUnmanaged('skills', 'synced\\abc_def\\manifest.json'), 'Windows separators are normalised');
+  assert.ok(isUnmanaged('skills', 'synced'));
+  assert.ok(!isUnmanaged('skills', 'synced-notes/SKILL.md'), 'a prefix match must stop at a path boundary');
+  assert.ok(!isUnmanaged('skills', 'pr-walkthrough/SKILL.md'));
+  assert.ok(!isUnmanaged('commands', 'synced/x.md'), 'only skills/ has an unmanaged area');
+});
+
+test('capture and orphans both skip synced skills but still see user skills', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const { execFileSync } = await import('node:child_process');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-home-'));
+  const write = (rel) => {
+    const file = path.join(home, ...rel.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'x');
+  };
+  write('skills/mine/SKILL.md');
+  write('skills/synced/abc_def/xlsx/SKILL.md');
+  write('skills/synced/abc_def/manifest.json');
+
+  const probe = `
+    const { plan } = await import(${JSON.stringify(new URL('../scripts/claude-capture.mjs', import.meta.url).href)});
+    const { orphans } = await import(${JSON.stringify(new URL('../scripts/claude-install.mjs', import.meta.url).href)});
+    const captured = plan().map((i) => i.srcFile).filter((f) => f.includes('skills'));
+    console.log(JSON.stringify({ captured, orphaned: orphans([]) }));
+  `;
+  const out = execFileSync(process.execPath, ['--input-type=module', '-e', probe], {
+    env: { ...process.env, CLAUDE_CONFIG_DIR: home },
+    encoding: 'utf8',
+  });
+  const { captured, orphaned } = JSON.parse(out.trim().split('\n').pop());
+  const rel = (list) => list.map((f) => path.relative(home, f).split(path.sep).join('/')).sort();
+
+  assert.deepEqual(rel(captured), ['skills/mine/SKILL.md']);
+  assert.deepEqual(rel(orphaned), ['skills/mine/SKILL.md']);
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
 test('removeEmptyParents stops at the boundary and leaves non-empty dirs', async () => {
   const { removeEmptyParents } = await import('../scripts/claude-install.mjs');
   const fs = await import('node:fs');

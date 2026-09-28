@@ -44,21 +44,21 @@ Typical session:
 
 Full-suite runs are fine in this repo.
 
-## Reporting timings to Danny (required)
+## Reporting timings to the developer (required)
 
-Danny uses these timings to judge whether the skill is working well or needs changing. Every command
+The developer uses these timings to judge whether the skill is working well or needs changing. Every command
 prints `[jnm] <step>: <time>` lines on stderr as it goes and ends with
 `[jnm] total: <command> took <time> (exit N)`. Every line is also appended to the timings log
 (`{{REPO_ROOT_SLASH}}/tmp/logs/jnm-timings.tsv`, override with `JNM_TIMINGS_LOG`).
 
-- **After every jnm command,** tell Danny the total and any step that took a noticeable share of it,
+- **After every jnm command,** tell the developer the total and any step that took a noticeable share of it,
   in one short line. For example: "`test api (specs)`: 8s (check 1s, run 5s)." Don't drop these
   lines when you summarise the test output.
 - **Compare against the Timings table below.** If a command or step takes more than about twice its
   expected time, say so plainly, name the step, and suggest a likely cause. A first run after the
   machine or Docker has been idle is often slow once (a cold file cache): a 17s spec took 1m28s the
   first time after a weekend. Run it again before calling it a regression.
-- **When Danny asks how the skill is doing** (or at the end of a session that used it heavily), run
+- **When the developer asks how the skill is doing** (or at the end of a session that used it heavily), run
   `bash $J timings` and summarise the trend: what got slower, what failed, which step dominates.
 - Never let a timing line hide a failure. The exit code and pass/fail summary come first.
 
