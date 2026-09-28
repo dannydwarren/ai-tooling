@@ -70,7 +70,7 @@ This rule covers files Claude creates on its own initiative — captured API res
   2. List every artifact published for the work, with title and URL, and state plainly that they need deleting at <https://claude.ai/code/artifacts>.
   - If admin credentials are available, `DELETE /v1/compliance/code/artifacts/{artifact_id}` (Compliance API) does it without the UI. Don't assume those credentials exist.
 - **Never record an artifact URL in `wip.md` history as a durable reference.** It is being deleted; cite the PR instead.
-- Anything published that is *not* a PR walkthrough — a design doc, a report someone else still needs — is kept unless Danny says otherwise. Ask rather than guess.
+- Anything published that is *not* a PR walkthrough — a design doc, a report someone else still needs — is kept unless the developer says otherwise. Ask rather than guess.
 
 ## DataDog
 - DataDog credentials are stored at `{{USER_HOME}}\.datadog\creds.txt`
@@ -94,7 +94,7 @@ All Claude Code sessions must maintain a personal work record at `{{USER_HOME}}\
 - **`wip.md`** — current in-progress, todo, and later work
 - **`history\YYYY-MM.md`** — completed work, one file per calendar month, named by the month the item was completed (e.g., `history\2026-04.md`)
 
-The goal of this system is to let Danny look back over a window of time and see what was accomplished and how it broke down across work types — to inform conversations with his manager about role balance.
+The goal of this system is to let the developer look back over a window of time and see what was accomplished and how it broke down across work types — to inform conversations with their manager about role balance.
 
 ### File structure
 
