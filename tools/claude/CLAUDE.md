@@ -60,6 +60,18 @@ This rule covers files Claude creates on its own initiative — captured API res
 - **Credentials are excluded entirely from the working tree**, even under `./tmp/`. Passwords, API keys, JWTs, and Bearer tokens must never be written inside the project directory. If a JWT must persist across Bash calls, cache it under `~/.jobnimbus/runtime/` (chmod 700 dir, chmod 600 file) and delete when done. Prefer chaining the login + dependent curls into a single Bash invocation so the JWT only lives as a shell variable.
 - **Clean up at end of task**: when work is complete, either move the artifact into a documentation location (e.g., `docs/`) or into `tmp/archive/{date}_{ticket-number}-{ticket-title}`. Don't leave scratch files or folders lingering in `tmp/` across sessions. Ensure WIP history has the end location folder logged.
 
+### Published Artifacts (claude.ai)
+"Artifact" here means a page published to claude.ai, not the scratch files above.
+
+- **PR walkthroughs are disposable.** A walkthrough exists to get a specific PR reviewed. Once that work is closed out it has no further use, so it gets deleted rather than left in the gallery.
+- **Delete on the explicit close command** — the same trigger as the Work Tracking close ("close up", "clean up", "wrap up", "the work is done/finished"). A merged PR alone is not the trigger.
+- **Claude cannot delete an artifact itself.** The Artifact tool has no delete action, and `/artifacts` only lists, opens, copies, and attaches. So at cleanup Claude must:
+  1. Delete the local source under `tmp/pr-walkthrough/` (the `.diff`, `.notes.json`, and `.html`).
+  2. List every artifact published for the work, with title and URL, and state plainly that they need deleting at <https://claude.ai/code/artifacts>.
+  - If admin credentials are available, `DELETE /v1/compliance/code/artifacts/{artifact_id}` (Compliance API) does it without the UI. Don't assume those credentials exist.
+- **Never record an artifact URL in `wip.md` history as a durable reference.** It is being deleted; cite the PR instead.
+- Anything published that is *not* a PR walkthrough — a design doc, a report someone else still needs — is kept unless Danny says otherwise. Ask rather than guess.
+
 ## DataDog
 - DataDog credentials are stored at `{{USER_HOME}}\.datadog\creds.txt`
 - NEVER print, echo, log, or otherwise output DataDog credentials to the console, chat, or any file other than the creds file itself
