@@ -211,7 +211,13 @@ function paragraphs(s) {
   return String(s ?? '')
     .split(/\n\s*\n/)
     .filter(Boolean)
-    .map((p) => `<p>${inline(p.trim())}</p>`)
+    .map((p) => {
+      const lines = p.trim().split(/\n/);
+      if (lines.every((l) => /^\s*- /.test(l))) {
+        return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^\s*- /, ''))}</li>`).join('')}</ul>`;
+      }
+      return `<p>${inline(p.trim())}</p>`;
+    })
     .join('');
 }
 

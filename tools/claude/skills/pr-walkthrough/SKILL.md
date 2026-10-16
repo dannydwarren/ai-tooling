@@ -92,6 +92,7 @@ unfortunately, clever (as praise), well-written, problematic.
   top of that file.
 - **`title`** makes a note a numbered stop in the rail. A note without one renders as a quiet aside.
 - Backticks in `summary`, `why`, `title` and `text` render as inline code.
+- In `summary` and `why`, a paragraph whose every line starts with `- ` renders as a bulleted list.
 
 ## What gets a note
 
