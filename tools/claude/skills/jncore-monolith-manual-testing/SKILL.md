@@ -1,6 +1,6 @@
 ---
 name: jncore-monolith-manual-testing
-description: Use when exercising jncore-monolith's API1 end to end against a real environment - release validation, post-deploy smoke, or reproducing a specific endpoint's behaviour. Phrasings include "run the API1 harness", "exercise API1 in dev", "did this release break API1", "test contact/job/estimate/invoice creation", "run the lanes", "smoke test jncore after the deploy", "reproduce the estimate delete rejection", "test the deployables in this PR", "verify the file-upload postprocessor / timebased automation / adhoc scripts after the deploy", "check the related-objects workers". Thirteen parallel lanes over the full API1 write surface; writes real records to the target account.
+description: Use when exercising jncore-monolith's API1 end to end against a real environment - release validation, post-deploy smoke, or reproducing a specific endpoint's behaviour. Phrasings include "run the API1 harness", "exercise API1 in dev", "did this release break API1", "test contact/job/estimate/invoice creation", "run the lanes", "smoke test jncore after the deploy", "reproduce the estimate delete rejection", "test the deployables in this PR", "verify the file-upload postprocessor / timebased automation / adhoc scripts after the deploy", "check the related-objects workers", "analyze the run's logs". Thirteen parallel lanes over the full API1 write surface plus a Datadog log analysis of the run; writes real records to the target account.
 ---
 
 # jncore-monolith manual testing
@@ -22,6 +22,8 @@ adhoc scripts are reached by no lane.
 | Path | What it is |
 |---|---|
 | `run-all.sh` | Fires every lane in parallel |
+| `run-and-analyze.sh` | `run-all.sh`, settle, merge, then `analyze-run` |
+| `analysis/` | `analyze-run.py` and its `pup` wrapper — the read-only Datadog analysis of a run |
 | `lanes/` | One file per lane — the call sequences |
 | `lib/` | Shared client, config, fixtures, manifest writer |
 | `endpoints/` | Per-endpoint instructions: what to call, what to expect, what lies |
@@ -153,6 +155,35 @@ count, replace the baseline with a clean run made after the change.
 A lane stops at its first failed gate and records `gated` rather than `failed`, so one broken
 fixture does not cost you the other twelve lanes. Check `status.json` per lane before reading
 anything into a short manifest.
+
+## Analyzing a run (`analyze-run`)
+
+```bash
+A2125_RUN_ID=<id> bash $H/run-and-analyze.sh
+```
+
+That runs every lane, settles, merges, and analyzes. On a run that is already merged:
+
+```bash
+python $H/analysis/analyze-run.py <id>
+```
+
+It needs `pup` authenticated (`pup auth status`) and only reads. It takes the window from
+`summary.json` (first write minus 10 s to last write plus 4 min), waits until the last write is
+three minutes old so ingestion has caught up, and writes `analysis.json` next to `summary.json`.
+
+| Section | What it checks |
+|---|---|
+| `profile` | call count, `byStatus` and non-2xx against `baselines/<env>.json`; every lane `completed` |
+| `laneM`, `correlation` | lane M's checks; .NET worker logs for its records, their correlation ids traced to nodeapi wide events |
+| `deliveries` | nodefarm and nodefarm-gs dispositions; every failed delivery |
+| `legacyLines` | `jnmq-error`, DLQ and drop-filter lines, which must be absent |
+| `http` | nodeapi wide events by outcome; 5xx, which must equal the harness's own 500s |
+| `errorLines` | jncore error lines split into registered ([known-issues](known-issues/README.md)) and unregistered |
+
+`clean: true` with an empty `problems` list is a pass, and the script exits 0. Unregistered error
+lines are printed for review but are not problems: the window covers the whole environment, so
+other accounts' errors land in it.
 
 ## Handing off to log analysis
 
