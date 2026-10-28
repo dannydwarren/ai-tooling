@@ -58,19 +58,22 @@ there likely covers this.
 env:prod service:nodeapi "unhandledRejection" "_replace"
 ```
 
-### KI-2 — `POST /files/v2/url` 500s on an empty `jnid`
+### KI-2 — `POST /files/v2/url` 500s on a missing or empty `jnid`
 
-`getAttachmentJnid` passes the client-supplied `jnid` straight to `jnCb.safeGet`. An empty
-string fails Couchbase key validation (`Key length must be >= 2`) with `InvalidArgumentError`,
-and `#_doesJnidExists` only swallows errors matching `key does not exist`, so it propagates.
+`getAttachmentJnid` passes the client-supplied `jnid` straight to `jnCb.safeGet`. A missing
+`jnid` or an empty string fails Couchbase key validation with `InvalidArgumentError` (the body
+reads `Error fetching database: invalid argument`). `#_doesJnidExists` only swallows errors
+matching `key does not exist`, so the error propagates.
 
 - Call site: `files-api/src/files-controller/services/attachment-record-service.js:115`,
   via `files-handler.js:45` `setMetaDataAndGetS3URL`
-- Lane case: `L4-files-v2-url`
+- Lane case: `L4-files-v2-url` (omits `jnid`)
 - Fails before `saveRecord`, so there is no partial write
-- Every other call to this endpoint returns 200; the fault is the empty input, not the route
+- The route works only when the caller sends its own unique `jnid` of two or more characters;
+  lane I's `file-presigned-url` does, and returns 200
 
-An empty client-supplied jnid should be treated as "not supplied", not passed to a key lookup.
+A missing or empty client-supplied jnid should be treated as "not supplied" and generated
+server-side, not passed to a key lookup.
 
 ### KI-3 — `POST /hover/job` returns 200 but enqueues an unprocessable message
 

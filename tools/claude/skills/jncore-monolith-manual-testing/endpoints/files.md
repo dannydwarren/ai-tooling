@@ -34,10 +34,9 @@ producer, a user name marks the legacy path.
 
 ## Gotchas
 
-- **`POST /files/v2/url` 500s on an empty `jnid`** — KI-2. The client-supplied value goes straight
-  to a Couchbase key lookup, which rejects anything shorter than two characters, and the catch only
-  swallows `key does not exist`. Expected in the control lane; every other call to the route
-  returns 200. The fault is the empty input, not the route.
+- **`POST /files/v2/url` 500s on a missing or empty `jnid`** — KI-2. The client-supplied value
+  goes straight to a Couchbase key lookup, and the catch only swallows `key does not exist`.
+  Callers must send their own unique `jnid`. Expected in the control lane, which omits it.
 - In jncore-monolith, `attachment` is the File record type. Side-effect activities are *enrolled*
   in a record save, never "attached".
 - The multipart upload takes `related` as a form field. Both the with-related and without-related

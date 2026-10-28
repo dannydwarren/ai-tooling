@@ -80,7 +80,7 @@ await runLane(LANE, async ({ api1, gate, marker }) => {
         expectedAction: ACTIONS.NONE,
         expectedDestinations: [],
         defectRef: DEFECTS.D3,
-        note: 'v2/files-handler.js:43 reads custAuth.customer with no guard that the auth context resolved one. A 500 in BOTH arms is pre-existing',
+        note: 'KI-2 — omits jnid, so getAttachmentJnid passes undefined to a Couchbase key lookup and the route 500s. Lane I file-presigned-url sends a jnid and gets 200',
     });
 
     const productId = await createProduct(api1, LANE);
