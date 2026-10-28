@@ -45,7 +45,7 @@ Check a non-2xx against that register before investigating it.
 ## Running it
 
 ```bash
-H=C:/Users/DannyWarren/.claude/skills/jncore-monolith-manual-testing
+H={{USER_HOME_SLASH}}/.claude/skills/jncore-monolith-manual-testing
 A2125_RUN_ID=<id> bash $H/run-all.sh
 ```
 
