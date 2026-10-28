@@ -196,6 +196,18 @@ Search by **jnid or probe marker, never by correlation id** — the dev gateway 
 A useful handoff is the run window in UTC, the company id, and the lane/case/status/jnid table out
 of `merged.jsonl`.
 
+Logs land in Datadog one to three minutes late. Query from just before the run to a few minutes
+after it, and not before the last write is about three minutes old.
+
+| Source | Query | Fields |
+|---|---|---|
+| .NET worker (`service:worker`) | `@tags:<jnid>` | queue in `@fields.worker.queue`; delivery correlation id in `@fields.jn-correlation-id` — a `dotnet-worker_<guid>` value means the message arrived without one |
+| jncore message deliveries | `@main:true service:(nodefarm OR nodefarm-gs)` | `@outcome`, `@disposition`, `@message_type` (the worker id), `@messaging.destination.name` (the queue) |
+| nodeapi requests | `@main:true service:nodeapi` | `@correlationId`, `@http.route`, `@http.response.status_code`, `@outcome` |
+
+A delivery's wide event is the record of it. There are no `@tags:jnmq-error`, DLQ or drop-filter
+lines to search; `legacyLines` in `analyze-run` checks they stay absent.
+
 ## Methodology constraints
 
 These are carried forward from the original plan because each one has already produced a wrong
@@ -211,6 +223,17 @@ conclusion at least once.
 - **API1's numeric `record_type` is not a test signal.** It is unreliable.
 - **`{type} {action}` activity types are artifacts**, not findings. Type 0 with a derived label is
   the intended end state.
+- **Debug lines are not shipped.** `RelatedObjectsUpdateForLocationWorker` logs `completed` only at
+  debug, so that queue has no positive log line. The child record's changed `location.id` is the
+  evidence.
+- **Datadog nests dotted keys.** A wide event's `error.message` comes back from the API as
+  `error: { message }`; read both shapes. Multi-field `--group-by` in `pup logs aggregate` returns
+  nothing, so group by one field at a time.
+- **`pup` can return an empty `done` result under load.** Run queries one at a time, and never read
+  an empty aggregate as zero where rows are expected; `analyze-run` retries those and then fails.
+- **Amazon MQ depth metrics report no data for the dev DLQs** (`related_objects_update.dlq`,
+  `related_objects_update_for_location.dlq`, `hover-job-request.dlq`). No data means unknown, not
+  empty. Use the delivery wide events and worker logs instead.
 
 Signals that look decisive and are not: the returned id shape, an API1 read-back on its own,
 absence from the API1 list immediately after a write, and any absent info log.
