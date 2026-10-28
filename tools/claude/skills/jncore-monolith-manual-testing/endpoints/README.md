@@ -14,7 +14,7 @@ assumptions about it are false.
 | [estimates](estimates.md) | G | `/api1/v2/estimates`, undelete, `PUT /api1/htmls/:docid` |
 | [invoices](invoices.md) | H | `/api1/v2/invoices`, undelete |
 | [creditmemos](creditmemos.md) | J | `POST /api1/creditmemos/:docid/undelete` |
-| [files](files.md) | I, L | `/api1/files/*` upload, modify, delete |
+| [files](files.md) | I, L | `/api1/files/*` upload, modify, delete, presigned upload through the postprocessor |
 | [proposals](proposals.md) | L | `PUT /api1/htmls/:docid/proposal` |
 | [misc](misc.md) | K | auth, hover, QBD child sync, `skip=system_update_activity` |
 

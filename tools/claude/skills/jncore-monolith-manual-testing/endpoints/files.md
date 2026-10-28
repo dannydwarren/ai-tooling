@@ -7,6 +7,7 @@ these are `/api1/files/...` on the same host — there is no separate base URL.
 |---|---|
 | `POST /files`, `/files/multipart`, `/files/fromUrl`, `/files/url`, `/files/v2/url` | **no activity** |
 | `PUT /files/:docid`, `PUT /files/v2/:docid` | **no activity** |
+| S3 PUT to the `/files/v2/url` signed URL | postprocessor moves the record; **no activity** |
 | `DELETE /api1/files/:docid` | `ActivityBulk` |
 
 ```bash
@@ -31,6 +32,21 @@ case, run this one.
 
 `created_by` on the resulting activity distinguishes the path taken: `System` marks the outbox
 producer, a user name marks the legacy path.
+
+## Presigned upload is the only route to the postprocessor
+
+Multipart upload writes the attachment directly and never touches `file-upload-postprocessor`.
+The presigned flow does:
+
+1. `POST /files/v2/url` with a client `jnid` writes `tmp-<jnid>` to the `tmp` bucket and returns
+   a signed S3 PUT URL.
+2. The S3 PUT raises an S3 event. That lands on the `file-upload-postprocessing-<env>` SQS queue.
+3. The postprocessor moves the tmp record into `main`, with `createUpdateActivity: false`, so no
+   activity results.
+
+`GET /files/:jnid/meta` returns 404 until step 3 finishes and 200 afterwards, so it is the
+completion signal. Lane I's `file-presigned-processed` polls it for up to a minute. Send the S3 PUT
+with no `Authorization` header and no extra query string, or the signature breaks.
 
 ## Gotchas
 

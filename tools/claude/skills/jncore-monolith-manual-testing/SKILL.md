@@ -47,7 +47,8 @@ A2125_RUN_ID=<id> bash $H/run-all.sh
 directory and every probe marker, so pick a fresh one per run and keep it — it is how you find the
 run in logs afterwards.
 
-A full 12-lane run is about 75 calls and finishes in under ten seconds.
+A full 12-lane run is about 75 calls. Lane I waits up to a minute for the postprocessor; every
+other lane finishes in under ten seconds.
 
 One lane on its own, which is what you want when chasing a specific endpoint:
 
@@ -127,7 +128,7 @@ record type — no account or record ids live in this skill.
 | F | Material order CRUD, both trees, supplier submit | [materialorders](endpoints/materialorders.md) |
 | G | Estimate CRUD and signing | [estimates](endpoints/estimates.md) |
 | H | Invoice CRUD | [invoices](endpoints/invoices.md) |
-| I | File upload, modify, delete | [files](endpoints/files.md) |
+| I | File upload, modify, delete; presigned upload through the postprocessor | [files](endpoints/files.md) |
 | J | Credit memo undelete via an AR fixture | [creditmemos](endpoints/creditmemos.md) |
 | K | Hover, QBD child sync, skip-system-update | [misc](endpoints/misc.md) |
 | L | Negative and edge cases | [proposals](endpoints/proposals.md), [files](endpoints/files.md) |
