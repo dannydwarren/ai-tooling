@@ -11,6 +11,17 @@
     "additionalDirectories": [
       "{{USER_HOME_JSON}}\\.jobnimbus"
     ],
+    "allow": [
+      "Bash(git push *)",
+      "Bash(gh pr create *)"
+    ],
+    "ask": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git push * +*)"
+    ],
     "deny": [
       "Read(~/.jobnimbus/creds/**)"
     ]
