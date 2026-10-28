@@ -40,12 +40,26 @@ It passes when all of these hold, after the `task_version` boundary:
 
 ## adhoc-scripts
 
-Run `.github/workflows/adhoc.yml` with `environment: dev`, `version: <branch or tag>` and
-`node_args: --script <name> ...`.
+Dispatch the Adhoc workflow with `gh`. A dev run needs no approval:
 
-- **Uncheck Skip Terraform** if the `adhoc_scripts` stack might be stale. A task definition that
-  still references a secret since deleted fails to start with `TaskFailedToStart … marked for
-  deletion`, and the script never runs.
+```bash
+gh workflow run adhoc.yml -R JobNimbus/jncore-monolith \
+  -f environment=dev -f version=<ref> -f startup_file=src/adhoc-scripts.js \
+  -f "node_args=--script <name> ..." -f skip_terraform=false
+gh run list -R JobNimbus/jncore-monolith --workflow adhoc.yml --limit 1
+gh run watch <runId> -R JobNimbus/jncore-monolith
+```
+
+- **`version`** is the git ref the image is built from: the PR branch while it is open, or the
+  first release tag containing the merge commit (`git merge-base --is-ancestor <sha> <tag>`) once
+  merged, because the branch is deleted on merge.
+- **`skip_terraform=false`** applies the `adhoc_scripts` stack first. That costs about two minutes,
+  but a stale stack is worse: a task definition that still references a since-deleted secret fails
+  with `TaskFailedToStart … marked for deletion`, and the script never runs.
+- **Dev company id:** `companyId` under `danny.dev.env` in `~/.jobnimbus/dev.idcache.json`.
+- **Logs:** `service:custom_nodescript_adhoc`. A run takes about four minutes end to end; the
+  script's own lines start about two minutes after dispatch. The workflow's monitor step fails
+  whenever the task exits non-zero, including on purpose.
 
 ### Choosing scripts
 
