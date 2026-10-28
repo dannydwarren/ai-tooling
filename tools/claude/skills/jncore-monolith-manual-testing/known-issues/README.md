@@ -100,6 +100,7 @@ Carried forward as F4 in the ARCH-2125 report.
 | `J ar-creditmemo-delete` | 404 then 204 | Accounts-receivable read-after-write lag; the lane retries 404 on purpose |
 | `L4-files-v2-url` | 500 | KI-2 |
 | `F mo-supplier-submit` | 500 | KI-4 |
+| `L7-htmls-estimate` | occasional 404 `ctx record could not be found` | The `<estimate>_html` state doc is not always readable straight after the estimate create. Re-run lane L; investigate only if it repeats |
 
 ## Observability gaps
 
