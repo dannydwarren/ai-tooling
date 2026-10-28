@@ -1,6 +1,6 @@
 ---
 name: jncore-monolith-manual-testing
-description: Use when exercising jncore-monolith's API1 end to end against a real environment - release validation, post-deploy smoke, or reproducing a specific endpoint's behaviour. Phrasings include "run the API1 harness", "exercise API1 in dev", "did this release break API1", "test contact/job/estimate/invoice creation", "run the lanes", "smoke test jncore after the deploy", "reproduce the estimate delete rejection". Twelve parallel lanes over the full API1 write surface; writes real records to the target account.
+description: Use when exercising jncore-monolith's API1 end to end against a real environment - release validation, post-deploy smoke, or reproducing a specific endpoint's behaviour. Phrasings include "run the API1 harness", "exercise API1 in dev", "did this release break API1", "test contact/job/estimate/invoice creation", "run the lanes", "smoke test jncore after the deploy", "reproduce the estimate delete rejection", "test the deployables in this PR", "verify the file-upload postprocessor / timebased automation / adhoc scripts after the deploy". Twelve parallel lanes over the full API1 write surface; writes real records to the target account.
 ---
 
 # jncore-monolith manual testing
@@ -11,6 +11,11 @@ to whoever is reading logs.
 
 It writes real records. Every run creates contacts, jobs, estimates, invoices and files in the
 target account, soft-deletes most of them, and leaves them there.
+
+When the request is "test the deployables in this PR", start from
+[deployables](endpoints/deployables.md). It maps each jncore-monolith package to what reaches it.
+The postprocessor is reached only through lane I's presigned upload. Timebased automation and
+adhoc scripts are reached by no lane.
 
 ## Layout
 
