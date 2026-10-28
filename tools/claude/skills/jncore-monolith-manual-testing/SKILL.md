@@ -28,6 +28,7 @@ adhoc scripts are reached by no lane.
 | `merge-manifests.mjs` | Collapses a run's lanes into `merged.jsonl` + `summary.json` |
 | `selftest.mjs` | Validates the harness without touching the network |
 | `known-issues/` | Registered defects the harness surfaces, with their KI numbers |
+| `baselines/` | Expected `byStatus` per environment, from the last good run |
 | `C:\src\tmp\jncore-api1-runs\<runId>\` | Output — manifest, status, request and response bodies, lane logs |
 
 Known defects the harness surfaces are registered in [known-issues](known-issues/README.md).
@@ -44,7 +45,7 @@ Check a non-2xx against that register before investigating it.
 ## Running it
 
 ```bash
-H={{CLAUDE_HOME_SLASH}}/skills/jncore-monolith-manual-testing
+H=C:/Users/DannyWarren/.claude/skills/jncore-monolith-manual-testing
 A2125_RUN_ID=<id> bash $H/run-all.sh
 ```
 
@@ -140,12 +141,13 @@ record type — no account or record ids live in this skill.
 
 ## Reading a run
 
-`summary.json` gives `byStatus`, the non-2xx rows and any successful call that came back without an
-entity id. Start there.
+In `summary.json`, start with `byStatus`, `nonSuccessCalls` (the non-2xx rows) and
+`successfulCallsWithoutEntityJnid`.
 
-The question a run answers is **did the status profile change**. Compare `byStatus` against the
-last good run for the same environment; an identical profile including the same expected failures
-is a pass. A new non-2xx, or an old one that disappeared, is the finding.
+The question a run answers is **did the status profile change**. Compare `byStatus` with
+`baselines/<env>.json`. An identical profile, including the same expected failures, is a pass. A
+new non-2xx, or an old one that disappeared, is the finding. When a lane change alters the call
+count, replace the baseline with a clean run made after the change.
 
 A lane stops at its first failed gate and records `gated` rather than `failed`, so one broken
 fixture does not cost you the other eleven lanes. Check `status.json` per lane before reading

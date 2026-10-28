@@ -1,0 +1,17 @@
+{
+  "calls": 75,
+  "byStatus": {
+    "200": 69,
+    "201": 1,
+    "204": 1,
+    "401": 1,
+    "404": 1,
+    "500": 2
+  },
+  "expectedNonSuccess": [
+    "J:ar-creditmemo-delete:404",
+    "L:L4-files-v2-url:500",
+    "F:mo-supplier-submit:500",
+    "L:L6-htmls-proposal-badId:401"
+  ]
+}
