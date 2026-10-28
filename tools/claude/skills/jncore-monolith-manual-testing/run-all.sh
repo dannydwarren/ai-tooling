@@ -16,7 +16,8 @@ mkdir -p "$LOG_DIR"
 
 if [ "$A2125_ARM" = "on" ]; then
     LANES=(a-activities b-contact c-job d-task e-workorder f-materialorder
-           g-estimate h-invoice i-files j-ar-creditmemo k-misc l-control)
+           g-estimate h-invoice i-files j-ar-creditmemo k-misc l-control
+           m-related-objects)
 else
     LANES=(l-control)
 fi

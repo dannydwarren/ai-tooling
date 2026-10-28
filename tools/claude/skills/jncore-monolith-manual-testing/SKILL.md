@@ -1,6 +1,6 @@
 ---
 name: jncore-monolith-manual-testing
-description: Use when exercising jncore-monolith's API1 end to end against a real environment - release validation, post-deploy smoke, or reproducing a specific endpoint's behaviour. Phrasings include "run the API1 harness", "exercise API1 in dev", "did this release break API1", "test contact/job/estimate/invoice creation", "run the lanes", "smoke test jncore after the deploy", "reproduce the estimate delete rejection", "test the deployables in this PR", "verify the file-upload postprocessor / timebased automation / adhoc scripts after the deploy". Twelve parallel lanes over the full API1 write surface; writes real records to the target account.
+description: Use when exercising jncore-monolith's API1 end to end against a real environment - release validation, post-deploy smoke, or reproducing a specific endpoint's behaviour. Phrasings include "run the API1 harness", "exercise API1 in dev", "did this release break API1", "test contact/job/estimate/invoice creation", "run the lanes", "smoke test jncore after the deploy", "reproduce the estimate delete rejection", "test the deployables in this PR", "verify the file-upload postprocessor / timebased automation / adhoc scripts after the deploy", "check the related-objects workers". Thirteen parallel lanes over the full API1 write surface; writes real records to the target account.
 ---
 
 # jncore-monolith manual testing
@@ -53,8 +53,8 @@ A2125_RUN_ID=<id> bash $H/run-all.sh
 directory and every probe marker, so pick a fresh one per run and keep it — it is how you find the
 run in logs afterwards.
 
-A full 12-lane run is about 75 calls. Lane I waits up to a minute for the postprocessor; every
-other lane finishes in under ten seconds.
+A full 13-lane run is about 94 calls. Lane I waits up to a minute for the postprocessor and lane M
+about 15 s for Elasticsearch; every other lane finishes in under ten seconds.
 
 One lane on its own, which is what you want when chasing a specific endpoint:
 
@@ -138,6 +138,7 @@ record type — no account or record ids live in this skill.
 | J | Credit memo undelete via an AR fixture | [creditmemos](endpoints/creditmemos.md) |
 | K | Hover, QBD child sync, skip-system-update | [misc](endpoints/misc.md) |
 | L | Negative and edge cases | [proposals](endpoints/proposals.md), [files](endpoints/files.md) |
+| M | Effect of the .NET related-objects workers on a job's task | [related-objects](endpoints/related-objects.md), [account-settings](endpoints/account-settings.md) |
 
 ## Reading a run
 
@@ -150,7 +151,7 @@ new non-2xx, or an old one that disappeared, is the finding. When a lane change 
 count, replace the baseline with a clean run made after the change.
 
 A lane stops at its first failed gate and records `gated` rather than `failed`, so one broken
-fixture does not cost you the other eleven lanes. Check `status.json` per lane before reading
+fixture does not cost you the other twelve lanes. Check `status.json` per lane before reading
 anything into a short manifest.
 
 ## Handing off to log analysis

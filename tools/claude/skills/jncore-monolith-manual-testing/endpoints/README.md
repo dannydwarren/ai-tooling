@@ -18,6 +18,7 @@ assumptions about it are false.
 | [deployables](deployables.md) | — | which jncore-monolith package each lane reaches; postprocessor, timebased automation, adhoc scripts |
 | [proposals](proposals.md) | L | `PUT /api1/htmls/:docid/proposal` |
 | [misc](misc.md) | K | auth, hover, QBD child sync, `skip=system_update_activity` |
+| [related-objects](related-objects.md) | M | `related_objects_update` and `related_objects_update_for_location`, through job and contact saves |
 | [account-settings](account-settings.md) | M | `GET /api1/account/settings`, read-only fixture source |
 
 ## The five side-effect actions
@@ -29,7 +30,8 @@ type supports them. Delete is a soft delete — `PUT` with `is_active: false`, n
 ## Out of scope
 
 The QuickBooks Desktop sync helper and the jncore workers both create activities, but neither is
-reachable from API1. Do not call them from here.
+reachable from API1. Do not call them from here. Lane M checks the effect of the .NET
+related-objects workers through record reads, not by calling them.
 
 `payment` has no write route at all — `payments-route.js` registers `GET` alone — so Created,
 Modified and Deleted are unreachable for it through API1.

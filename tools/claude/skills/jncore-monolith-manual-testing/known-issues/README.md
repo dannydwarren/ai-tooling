@@ -3,7 +3,7 @@
 Defects the API1 lane harness surfaces in DEV. Every item here has been attributed, so a
 future run can match against this register instead of re-investigating.
 
-Harness: the parent folder (12 lanes, ~75 calls, `app.dev.jobnimbus.dev`);
+Harness: the parent folder (13 lanes, ~94 calls, `app.dev.jobnimbus.dev`);
 its `endpoints/` docs cite these KI numbers. Each URL carries `?probe=<marker>`. The dev gateway
 replaces `jn-correlation-id`, so search DataDog by jnid or by probe marker, never by correlation id.
 
