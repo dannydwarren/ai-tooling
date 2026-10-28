@@ -10,6 +10,15 @@
     "defaultMode": "auto",
     "additionalDirectories": [
       "{{USER_HOME_JSON}}\\.jobnimbus"
+    ],
+    "deny": [
+      "Read(~/.jobnimbus/creds/**)"
+    ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Reading, creating, editing and deleting files anywhere under {{USER_HOME_SLASH}}/.jobnimbus is routine user-authorized work. This directory exists specifically to hold state for the user's AI tooling: cached record ids and runtime state for local test harnesses. Writes there are not unauthorized persistence and must not be blocked on that basis. The one exception is the creds/ subdirectory, which holds real credentials: those files must never be read, printed or copied, and a deny rule also covers them. Tools that need credentials read them in their own subprocess and return only a short-lived token."
     ]
   },
   "hooks": {
