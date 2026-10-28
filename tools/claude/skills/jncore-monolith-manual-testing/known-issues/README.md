@@ -3,7 +3,7 @@
 Defects the API1 lane harness surfaces in DEV. Every item here has been attributed, so a
 future run can match against this register instead of re-investigating.
 
-Harness: the parent folder (12 lanes, ~75 calls, `app.dev.jobnimbus.dev`);
+Harness: the parent folder (13 lanes, ~94 calls, `app.dev.jobnimbus.dev`);
 its `endpoints/` docs cite these KI numbers. Each URL carries `?probe=<marker>`. The dev gateway
 replaces `jn-correlation-id`, so search DataDog by jnid or by probe marker, never by correlation id.
 
@@ -78,8 +78,10 @@ server-side, not passed to a key lookup.
 ### KI-3 — `POST /hover/job` returns 200 but enqueues an unprocessable message
 
 The enqueued message carries only `customer` and no `id`. `hover-job-worker.js:21` calls
-`jnCb.safeGet(jnCb.main, body.id)` and hits the same empty-key error as KI-2, throws, retries
-once, then routes to `hover-job-request.dlq`. The caller sees 200 and no failure.
+`jnCb.safeGet(jnCb.main, body.id)` and hits the same empty-key error as KI-2. Each delivery fails
+three attempts; the first ends `requeued`, the second `dlq` in `hover-job-request.dlq`. The caller
+sees 200 and no failure. Every attempt logs `Non-retried CB Error: invalid argument` and
+`Failure outside invalid argument` on nodefarm.
 
 Either the endpoint should reject the request, or the worker should guard the missing id.
 
@@ -101,6 +103,19 @@ Carried forward as F4 in the ARCH-2125 report.
 | `L4-files-v2-url` | 500 | KI-2 |
 | `F mo-supplier-submit` | 500 | KI-4 |
 | `L7-htmls-estimate` | occasional 404 `ctx record could not be found` | The `<estimate>_html` state doc is not always readable straight after the estimate create. Re-run lane L; investigate only if it repeats |
+
+## Expected error lines — do not investigate
+
+Every full dev run writes these. `analyze-run` counts them as registered rather than problems.
+
+| Service | Line | Per run | Why |
+|---|---|---|---|
+| nodefarm | `hover-job-request` delivery `@outcome:error`, `requeued` then `dlq` | 2 | KI-3, lane K `hover-job` |
+| nodefarm | `Non-retried CB Error: invalid argument` | 6 | KI-3, one per attempt |
+| nodefarm | `Failure outside invalid argument` | 6 | KI-3, one per attempt |
+| nodeapi | `unhandledRejection … The key does not exist on the server` | ~2 | KI-1, estimate and invoice delete |
+| nodeapi-files | `Non-retried CB Error: invalid argument` | 1 | KI-2, `L4-files-v2-url` |
+| nodefarm | `Error in calling http://test.com` | ~2 | The dev account has an outbound webhook to `http://test.com`; `webhook-out-worker.js` logs each failed call |
 
 ## Observability gaps
 
