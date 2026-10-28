@@ -183,11 +183,12 @@ test('rules the user added by hand are never removed', () => {
   assert.deepEqual(mergePermissionRules(live, {}).permissions, live);
 });
 
-test('the shipped settings allow pushing and opening PRs, and ask before a force push', () => {
+test('the shipped settings allow pushing and opening PRs, and ask only before force pushing main or master', () => {
   const rules = sourcePermissionRules();
   assert.ok(rules.allow.includes('Bash(git push *)'));
   assert.ok(rules.allow.includes('Bash(gh pr create *)'));
-  assert.ok(rules.ask.includes('Bash(git push --force*)'));
+  assert.ok(rules.ask.length > 0);
+  assert.ok(rules.ask.every((rule) => rule.startsWith('Bash(git push ') && /main|master/.test(rule)));
   assert.ok(rules.deny.includes('Read(~/.jobnimbus/creds/**)'));
 });
 

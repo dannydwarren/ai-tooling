@@ -16,11 +16,16 @@
       "Bash(gh pr create *)"
     ],
     "ask": [
-      "Bash(git push --force*)",
-      "Bash(git push -f*)",
-      "Bash(git push * --force*)",
-      "Bash(git push * -f*)",
-      "Bash(git push * +*)"
+      "Bash(git push *--force* *main*)",
+      "Bash(git push *main* --force*)",
+      "Bash(git push *-f *main*)",
+      "Bash(git push *main* -f*)",
+      "Bash(git push *+main*)",
+      "Bash(git push *--force* *master*)",
+      "Bash(git push *master* --force*)",
+      "Bash(git push *-f *master*)",
+      "Bash(git push *master* -f*)",
+      "Bash(git push *+master*)"
     ],
     "deny": [
       "Read(~/.jobnimbus/creds/**)"
