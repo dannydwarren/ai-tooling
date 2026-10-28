@@ -18,6 +18,7 @@ assumptions about it are false.
 | [deployables](deployables.md) | — | which jncore-monolith package each lane reaches; postprocessor, timebased automation, adhoc scripts |
 | [proposals](proposals.md) | L | `PUT /api1/htmls/:docid/proposal` |
 | [misc](misc.md) | K | auth, hover, QBD child sync, `skip=system_update_activity` |
+| [account-settings](account-settings.md) | M | `GET /api1/account/settings`, read-only fixture source |
 
 ## The five side-effect actions
 
