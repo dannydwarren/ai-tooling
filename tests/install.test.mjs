@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { isManagedCommand, stripManaged, addManaged, catalogEntries, canonical } from '../scripts/claude-install.mjs';
+import { isManagedCommand, stripManaged, addManaged, catalogEntries, canonical, mergePermissionRules, sourcePermissionRules } from '../scripts/claude-install.mjs';
 import { render, unrender, placeholdersIn, derivedValues, jsonEscaped, requiredValueKeys, loadPrivateValues } from '../scripts/lib/template.mjs';
 import { toPosix, toSlash, REPO_ROOT } from '../scripts/lib/paths.mjs';
 import { checkPlaceholders, validate } from '../scripts/checks/validate-assets.mjs';
@@ -152,6 +152,44 @@ test('drift detection still sees a genuine difference', () => {
   );
   assert.notEqual(canonical({ a: 1 }), canonical({ a: '1' }));
   assert.notEqual(canonical([1, 2]), canonical([2, 1]));
+});
+
+test('permission rules from the repo are appended to the live lists without disturbing them', () => {
+  const live = { defaultMode: 'auto', allow: ['Bash(npm *)'], deny: ['Read(~/.secret)'] };
+  const { permissions, added } = mergePermissionRules(live, {
+    allow: ['Bash(git push *)'],
+    ask: ['Bash(git push --force*)'],
+    deny: ['Read(~/.secret)'],
+  });
+  assert.deepEqual(permissions, {
+    defaultMode: 'auto',
+    allow: ['Bash(npm *)', 'Bash(git push *)'],
+    ask: ['Bash(git push --force*)'],
+    deny: ['Read(~/.secret)'],
+  });
+  assert.deepEqual(added, ['allow Bash(git push *)', 'ask Bash(git push --force*)']);
+});
+
+test('merging permission rules twice adds nothing the second time', () => {
+  const rules = { allow: ['Bash(git push *)'] };
+  const once = mergePermissionRules({}, rules).permissions;
+  const twice = mergePermissionRules(once, rules);
+  assert.deepEqual(twice.permissions, once);
+  assert.deepEqual(twice.added, []);
+});
+
+test('rules the user added by hand are never removed', () => {
+  const live = { allow: ['Bash(mine *)'] };
+  assert.deepEqual(mergePermissionRules(live, {}).permissions, live);
+});
+
+test('the shipped settings allow pushing and opening PRs, and ask only before force pushing main or master', () => {
+  const rules = sourcePermissionRules();
+  assert.ok(rules.allow.includes('Bash(git push *)'));
+  assert.ok(rules.allow.includes('Bash(gh pr create *)'));
+  assert.ok(rules.ask.length > 0);
+  assert.ok(rules.ask.every((rule) => rule.startsWith('Bash(git push ') && /main|master/.test(rule)));
+  assert.ok(rules.deny.includes('Read(~/.jobnimbus/creds/**)'));
 });
 
 test('capturing settings strips the hooks the installer generates', async () => {

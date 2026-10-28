@@ -65,6 +65,16 @@ Both hooks are strictly passive: they always exit 0 and swallow their own errors
 that can break a session is worse than no audit logger. Full design in
 [skill-audit.md](skill-audit.md).
 
+### `force-push-needs-branch` — `PreToolUse` on `Bash|PowerShell`
+
+Blocks a force push that does not name the branch it overwrites: `--force`, `-f`, `--force-with-lease`
+or a `+refspec` with no destination, a destination of `HEAD`, or `--all`/`--mirror`. Naming the
+current branch is still required. Exit 2 vetoes the command and tells the model to use
+`git push --force-with-lease origin <branch>`.
+
+It pairs with the `ask` rules in `settings.json`, which prompt before a force push to `main` or
+`master`. Permission rules cannot see a missing argument, so this hook covers what they cannot.
+
 ### `no-comments` — `PostToolUse` on `Edit|Write`
 
 Enforces the no-code-comments rule from `CLAUDE.md`. When an `Edit` or `Write` introduces a comment

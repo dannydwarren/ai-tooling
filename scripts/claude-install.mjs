@@ -137,6 +137,33 @@ export function addManaged(hooks, entries, values) {
   return { hooks: out, applied };
 }
 
+export const RULE_LISTS = ['allow', 'ask', 'deny'];
+
+export function sourcePermissionRules() {
+  const source = readJson(path.join(SOURCE, 'settings', 'settings.json'), {});
+  const rules = {};
+  for (const list of RULE_LISTS) {
+    const entries = source.permissions?.[list];
+    if (Array.isArray(entries) && entries.length > 0) rules[list] = entries;
+  }
+  return rules;
+}
+
+export function mergePermissionRules(permissions, rules) {
+  const out = { ...(permissions ?? {}) };
+  const added = [];
+  for (const list of RULE_LISTS) {
+    const wanted = rules[list] ?? [];
+    if (wanted.length === 0) continue;
+    const current = Array.isArray(out[list]) ? out[list] : [];
+    const missing = wanted.filter((rule) => !current.includes(rule));
+    if (missing.length === 0) continue;
+    out[list] = [...current, ...missing];
+    added.push(...missing.map((rule) => `${list} ${rule}`));
+  }
+  return { permissions: out, added };
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const values = loadValues();
@@ -207,21 +234,29 @@ function main() {
     applied = result.applied;
   }
   const after = canonical(nextHooks);
+  const hooksChanged = before !== after;
 
-  if (before !== after) {
+  const { permissions: nextPermissions, added: addedRules } = args.uninstall
+    ? { permissions: settings.permissions, added: [] }
+    : mergePermissionRules(settings.permissions, sourcePermissionRules());
+
+  if (hooksChanged) {
     changes.push(
       args.uninstall
         ? `remove managed hooks from ${settingsFile}`
         : `set managed hooks [${applied.join(', ')}] in ${settingsFile}`,
     );
-    if (!args.check && missingValues.size === 0) {
-      const saved = backup(settingsFile);
-      const next = { ...settings };
-      if (Object.keys(nextHooks).length > 0) next.hooks = nextHooks;
-      else delete next.hooks;
-      writeJson(settingsFile, next);
-      if (saved) changes.push(`backed up previous settings to ${saved}`);
-    }
+  }
+  for (const rule of addedRules) changes.push(`add permission rule ${rule} in ${settingsFile}`);
+
+  if ((hooksChanged || addedRules.length > 0) && !args.check && missingValues.size === 0) {
+    const saved = backup(settingsFile);
+    const next = { ...settings };
+    if (Object.keys(nextHooks).length > 0) next.hooks = nextHooks;
+    else delete next.hooks;
+    if (addedRules.length > 0) next.permissions = nextPermissions;
+    writeJson(settingsFile, next);
+    if (saved) changes.push(`backed up previous settings to ${saved}`);
   }
 
   const label = args.uninstall ? 'uninstall' : args.check ? 'check' : 'install';
