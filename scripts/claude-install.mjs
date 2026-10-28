@@ -164,6 +164,26 @@ export function mergePermissionRules(permissions, rules) {
   return { permissions: out, added };
 }
 
+export function sourceAutoModeAllow(values) {
+  const source = readJson(path.join(SOURCE, 'settings', 'settings.json'), {});
+  const entries = source.autoMode?.allow;
+  if (!Array.isArray(entries)) return [];
+  return entries.map((entry) => {
+    const { text, missing } = render(entry, values);
+    if (missing.length > 0) {
+      throw new Error(`autoMode.allow entry has unresolved placeholders: ${missing.join(', ')}`);
+    }
+    return text;
+  });
+}
+
+export function mergeAutoModeAllow(autoMode, entries) {
+  const current = Array.isArray(autoMode?.allow) ? autoMode.allow : [];
+  const missing = entries.filter((entry) => !current.includes(entry));
+  if (missing.length === 0) return { autoMode, added: [] };
+  return { autoMode: { ...(autoMode ?? {}), allow: [...current, ...missing] }, added: missing };
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const values = loadValues();
@@ -249,12 +269,18 @@ function main() {
   }
   for (const rule of addedRules) changes.push(`add permission rule ${rule} in ${settingsFile}`);
 
-  if ((hooksChanged || addedRules.length > 0) && !args.check && missingValues.size === 0) {
+  const { autoMode: nextAutoMode, added: addedAllow } = args.uninstall
+    ? { autoMode: settings.autoMode, added: [] }
+    : mergeAutoModeAllow(settings.autoMode, sourceAutoModeAllow(values));
+  for (const entry of addedAllow) changes.push(`add autoMode.allow entry "${entry.slice(0, 60)}…" in ${settingsFile}`);
+
+  if ((hooksChanged || addedRules.length > 0 || addedAllow.length > 0) && !args.check && missingValues.size === 0) {
     const saved = backup(settingsFile);
     const next = { ...settings };
     if (Object.keys(nextHooks).length > 0) next.hooks = nextHooks;
     else delete next.hooks;
     if (addedRules.length > 0) next.permissions = nextPermissions;
+    if (addedAllow.length > 0) next.autoMode = nextAutoMode;
     writeJson(settingsFile, next);
     if (saved) changes.push(`backed up previous settings to ${saved}`);
   }
