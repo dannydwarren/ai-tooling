@@ -2,6 +2,12 @@
   "note": "Accepted findings from scripts/checks/scan.mjs. Every entry needs a written reason. An entry matches when all of its present fields match a finding: `file` (glob, repo-relative, forward slashes), `rule` (rule id from security/patterns.json), `fingerprint` (from the scan report). Prefer the narrowest entry that works. Allowlisting a `secret`-severity rule should be rare and is a deliberate decision. See docs/security.md.",
   "entries": [
     {
+      "file": "tools/claude/skills/jncore-monolith-manual-testing/selftest.mjs",
+      "rule": "uuid",
+      "fingerprint": "6760ec43c8b7fd05",
+      "reason": "The all-zeros nil UUID, used as a synthetic correlation id in an offline self-test; it identifies nothing."
+    },
+    {
       "file": "tools/claude/skills/jncore-monolith-docker-test/scripts/jnm.sh",
       "rule": "assigned-credential",
       "fingerprint": "bb7fcae4a6c358ea",
