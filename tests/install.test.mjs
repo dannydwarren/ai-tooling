@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { isManagedCommand, stripManaged, addManaged, catalogEntries, canonical, mergePermissionRules, sourcePermissionRules } from '../scripts/claude-install.mjs';
+import { isManagedCommand, stripManaged, addManaged, catalogEntries, canonical, mergePermissionRules, sourcePermissionRules, mergeAutoModeAllow, sourceAutoModeAllow } from '../scripts/claude-install.mjs';
 import { render, unrender, placeholdersIn, derivedValues, jsonEscaped, requiredValueKeys, loadPrivateValues } from '../scripts/lib/template.mjs';
 import { toPosix, toSlash, REPO_ROOT } from '../scripts/lib/paths.mjs';
 import { checkPlaceholders, validate } from '../scripts/checks/validate-assets.mjs';
@@ -190,6 +190,29 @@ test('the shipped settings allow pushing and opening PRs, and ask only before fo
   assert.ok(rules.ask.length > 0);
   assert.ok(rules.ask.every((rule) => rule.startsWith('Bash(git push ') && /main|master/.test(rule)));
   assert.ok(rules.deny.includes('Read(~/.jobnimbus/creds/**)'));
+});
+
+test('autoMode allow entries from the repo are appended after the live ones', () => {
+  const live = { allow: ['$defaults', 'mine'], soft_deny: ['x'] };
+  const { autoMode, added } = mergeAutoModeAllow(live, ['$defaults', 'theirs']);
+  assert.deepEqual(autoMode, { allow: ['$defaults', 'mine', 'theirs'], soft_deny: ['x'] });
+  assert.deepEqual(added, ['theirs']);
+});
+
+test('merging autoMode allow entries twice adds nothing the second time', () => {
+  const once = mergeAutoModeAllow(undefined, ['$defaults', 'theirs']).autoMode;
+  assert.deepEqual(once, { allow: ['$defaults', 'theirs'] });
+  const twice = mergeAutoModeAllow(once, ['$defaults', 'theirs']);
+  assert.equal(twice.autoMode, once);
+  assert.deepEqual(twice.added, []);
+});
+
+test('shipped autoMode entries are rendered before comparison, so an installed entry is not duplicated', () => {
+  const entries = sourceAutoModeAllow({ ...VALUES, USER_HOME_SLASH: 'C:/Users/Someone' });
+  assert.ok(entries.every((entry) => !entry.includes('{{')));
+  assert.ok(entries.some((entry) => entry.includes('C:/Users/Someone/.jobnimbus')));
+  assert.ok(entries.some((entry) => entry.includes('github.com/dannydwarren/*')));
+  assert.deepEqual(mergeAutoModeAllow({ allow: entries }, entries).added, []);
 });
 
 test('capturing settings strips the hooks the installer generates', async () => {
