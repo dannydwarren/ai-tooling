@@ -154,6 +154,12 @@ You do not hand-write HTML, and you do not need to describe the page in chat —
   segments. New and deleted files render one pane, not two.
 - Syntax highlighting for C#, TS/JS, JSON, HCL, YAML, shell, SQL, Python, Go, CSS and XML-family
   files, by extension — keywords, strings, comments, numbers, types and call sites.
+- The file header sticks to the top of the viewport, and under it a bar naming the construct the
+  code sits in. For C# the renderer tracks that itself, row by row, seeded from git's `@@` context:
+  a hunk is cut at each change of declaration so the bar swaps as you scroll, and a new or deleted
+  file — which git gives no `@@` context at all — is labelled from its own rows. Other languages
+  show git's hunk header. A cut made for a note carries no bar; a bar means the declaration
+  changed.
 - Five palettes in a Theme picker, each defined for light and dark; the reader's choice persists.
 - A reading-order rail, collapsible, listing every titled note.
 - The note gutter is always reserved, so code width never changes down a file.

@@ -111,6 +111,61 @@ const EXTENSIONS = {
   xml: 'xml', html: 'xml', csproj: 'xml', props: 'xml', config: 'xml', targets: 'xml',
 };
 
+const CSHARP_MODIFIER =
+  '(?:public|private|protected|internal|static|sealed|abstract|partial|virtual|override|async|extern|unsafe|readonly|required|const|file|implicit|explicit|volatile)';
+const CSHARP_TYPE = new RegExp(
+  `^(?:\\[[^\\]]*\\] )*(?:${CSHARP_MODIFIER} )*(?:class|record|struct|interface|enum|delegate) `
+);
+const CSHARP_MEMBER = new RegExp(`^(?:\\[[^\\]]*\\] )*(?:${CSHARP_MODIFIER} )+`);
+
+function tidyDecl(text) {
+  const t = text.replace(/\s*[{;]\s*$/, '').replace(/\s*=>\s*$/, '').trim();
+  return t.length > 110 ? `${t.slice(0, 109)}\u2026` : t;
+}
+
+// The enclosing C# declaration a line introduces, or null. Field initializers and
+// one-line auto-properties are deliberately not declarations: they would churn the bar.
+function csharpDecl(raw) {
+  const t = raw.replace(/\s+/g, ' ').trim();
+  if (!t || t.startsWith('//')) return null;
+  if (/^namespace /.test(t)) return { kind: 'type', text: tidyDecl(t) };
+  if (CSHARP_TYPE.test(t)) return { kind: 'type', text: tidyDecl(t) };
+  if (!CSHARP_MEMBER.test(t)) return null;
+  const head = t.split('(')[0];
+  if (/[^=!<>]=[^=]/.test(head)) return null;
+  if (t.includes('(')) return { kind: 'member', text: tidyDecl(t) };
+  if (/\{ *get/.test(t) && !t.includes('}')) return { kind: 'member', text: tidyDecl(t) };
+  return null;
+}
+
+// Label every row with the declaration in force at it. Git's own @@ context seeds each
+// hunk, which is what covers a hunk opening inside a body whose header is off-diff; a new
+// or deleted file arrives with no context at all and is labelled entirely from its rows.
+function labelDeclarations(file, lang) {
+  if (lang !== 'csharp') return;
+  const sideKind = file.status === 'deleted' ? 'del' : 'add';
+  for (const hunk of file.hunks) {
+    let type = '';
+    let member = '';
+    const seed = hunk.header ? csharpDecl(hunk.header) : null;
+    if (seed) (seed.kind === 'type' ? (type = seed.text) : (member = seed.text));
+    else if (hunk.header) member = tidyDecl(hunk.header);
+
+    for (const row of hunk.rows) {
+      if (row.kind === 'ctx' || row.kind === sideKind) {
+        const found = csharpDecl(row.text);
+        if (found?.kind === 'type') {
+          type = found.text;
+          member = '';
+        } else if (found) {
+          member = found.text;
+        }
+      }
+      row.decl = member && type ? `${type} \u203a ${member}` : member || type;
+    }
+  }
+}
+
 function langFor(path) {
   const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
   return EXTENSIONS[ext] ?? 'none';
@@ -294,37 +349,52 @@ function segment(rows, note, bar, status) {
   const aside = note ? renderNote(note) : '';
 
   return `<section class="hunk${aside ? ' annotated' : ''}">
-  <div class="code unified${gutter}">${bar}${unified}</div>
+  <div class="code unified${gutter}">${bar}<div class="rows">${unified}</div></div>
   <div class="code split">${bar}${panes}</div>
   <div class="margin${aside ? '' : ' empty'}">${aside}</div>
 </section>`;
 }
 
 function renderHunk(hunk, pending, status) {
-  const context = hunk.header ? `<span class="hunk-ctx">${esc(hunk.header)}</span>` : '';
-  const bar = `<div class="hunk-bar"><span class="hunk-range">${esc(hunk.range)}</span>${context}</div>`;
+  const barFor = (cut, first) => {
+    const label = cut.decl || (first ? hunk.header : '');
+    const range = first ? `<span class="hunk-range">${esc(hunk.range)}</span>` : '';
+    const context = label ? `<span class="hunk-ctx">${esc(label)}</span>` : '';
+    return range || context ? `<div class="hunk-bar">${range}${context}</div>` : '';
+  };
 
   const marks = [...pending].sort((a, b) => a.line - b.line);
-  if (marks.length === 0) return segment(hunk.rows, null, bar, status);
-
   const cuts = [];
-  let current = { note: null, rows: [] };
+  let current = { note: null, rows: [], decl: '' };
   let next = 0;
   let line = hunk.newStart;
 
+  // A cut starts at each note and at each change of enclosing declaration, so every
+  // stretch of code carries its own sticky bar naming what it sits inside.
   for (const row of hunk.rows) {
     if (row.new != null) line = row.new;
     while (next < marks.length && line >= marks[next].line) {
       if (current.rows.length > 0 || current.note) cuts.push(current);
-      current = { note: marks[next], rows: [] };
+      current = { note: marks[next], rows: [], decl: row.decl ?? current.decl };
       next++;
+    }
+    if (row.decl !== undefined && row.decl !== current.decl) {
+      if (current.rows.length === 0) current.decl = row.decl;
+      else {
+        cuts.push(current);
+        current = { note: null, rows: [], decl: row.decl };
+      }
     }
     current.rows.push(row);
   }
   cuts.push(current);
-  for (; next < marks.length; next++) cuts.push({ note: marks[next], rows: [] });
+  for (; next < marks.length; next++) cuts.push({ note: marks[next], rows: [], decl: current.decl });
 
-  return cuts.map((c, i) => segment(c.rows, c.note, i === 0 ? bar : '', status)).join('');
+  // A cut made for a note sits inside the declaration it was already under, so it
+  // carries no bar: a bar means the enclosing declaration changed.
+  return cuts
+    .map((c, i) => segment(c.rows, c.note, i === 0 || c.decl !== cuts[i - 1].decl ? barFor(c, i === 0) : '', status))
+    .join('');
 }
 
 function renderFile(file) {
@@ -336,6 +406,7 @@ function renderFile(file) {
   if (annotated) route.push({ path: file.path, notes: fileNotes });
 
   const lang = langFor(file.path);
+  labelDeclarations(file, lang);
   const ahead = { block: false };
   const behind = { block: false };
   for (const hunk of file.hunks) {
@@ -639,12 +710,13 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 .why p { margin: 0 0 0.6rem; }
 .why p:last-child { margin-bottom: 0; }
 .totals { font-family: var(--mono); font-size: 0.8rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
-.file { border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); margin-bottom: 0.85rem; overflow: hidden; }
+.file { border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); margin-bottom: 0.85rem; overflow: clip; }
 .file.has-notes { border-color: color-mix(in srgb, var(--accent) 35%, var(--rule)); }
 .file > summary {
   display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
   padding: 0.5rem 0.7rem; cursor: pointer; background: var(--sunk);
   border-bottom: 1px solid var(--rule); list-style: none;
+  position: sticky; top: 0; z-index: 4;
 }
 .file > summary::-webkit-details-marker { display: none; }
 .file > summary::before { content: "▸"; color: var(--ink-faint); font-size: 0.7rem; }
@@ -677,7 +749,7 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
   .hunk { grid-template-columns: minmax(0, 1fr) 30rem; }
 }
 .code { min-width: 0; padding-bottom: 0.2rem; }
-.code.unified { overflow-x: auto; }
+.code.unified > .rows { overflow-x: auto; }
 .shell[data-view="split"] .code.unified { display: none; }
 .shell[data-view="unified"] .code.split { display: none; }
 .panes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -696,6 +768,7 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 .t-key { color: var(--tok-key); }
 .t-f { color: var(--tok-f); }
 .hunk + .hunk .code { border-top: 1px solid var(--rule); }
+.hunk-bar:empty { display: none; }
 
 .toolbar { display: flex; gap: 0.75rem; align-items: center; margin-bottom: 0.85rem; }
 .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
@@ -717,9 +790,12 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 .hunk-bar {
   display: flex; gap: 1rem; padding: 0.3rem 0.6rem;
   background: var(--sunk); color: var(--ink-faint);
-  font-family: var(--mono); font-size: 0.74rem; white-space: nowrap;
+  font-family: var(--mono); font-size: 0.74rem;
+  position: sticky; top: var(--file-head, 2.6rem); z-index: 2;
+  border-bottom: 1px solid var(--rule);
 }
-.hunk-ctx { color: var(--ink-soft); }
+.hunk-range { flex: none; }
+.hunk-ctx { color: var(--ink-soft); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row { display: grid; grid-template-columns: 2.9rem 2.9rem minmax(0, 1fr); align-items: baseline; }
 .row code {
   font-size: 0.8rem; line-height: 1.5; white-space: pre; padding-right: 0.5rem; font-weight: 500;
@@ -845,6 +921,18 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
     });
   }
 
+  function headOffsets() {
+    document.querySelectorAll('.file').forEach(function (file) {
+      var head = file.querySelector(':scope > summary');
+      if (head) file.style.setProperty('--file-head', head.offsetHeight + 'px');
+    });
+  }
+  headOffsets();
+  window.addEventListener('resize', headOffsets);
+  document.querySelectorAll('.seg button, .rail-toggle').forEach(function (b) {
+    b.addEventListener('click', function () { requestAnimationFrame(headOffsets); });
+  });
+
   document.querySelectorAll('.file').forEach(function (file) {
     var left = [];
     var right = [];
@@ -854,7 +942,7 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
     });
     link(left);
     link(right);
-    link([].slice.call(file.querySelectorAll('.code.unified')));
+    link([].slice.call(file.querySelectorAll('.code.unified > .rows')));
   });
 })();
 </script>
