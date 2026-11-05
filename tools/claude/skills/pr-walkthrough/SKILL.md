@@ -51,8 +51,19 @@ unfortunately, clever (as praise), well-written, problematic.
    Record `headRefOid` and put its short form in the page meta. A diff fetched without checking the
    head can be stale — this has happened, and the walkthrough was written against three of six
    commits.
-2. **Get the diff.** `gh pr diff <n> --repo <owner/repo> > ./tmp/pr-walkthrough/<n>.diff`. Check the
-   file list in the diff against the `files` list from step 1; if they disagree, re-fetch.
+2. **Get the diff**, from a local clone where there is one, so git labels each hunk with the
+   enclosing method or heading. `diff.gitattributes` in this skill maps extensions to git's
+   built-in diff drivers (`*.cs diff=csharp`, `*.md diff=markdown`, …); a repo's own
+   `.gitattributes` still wins for any file type it sets.
+
+   ```sh
+   git -C <clone> fetch origin "refs/pull/<n>/head:refs/walkthrough/pr<n>" <baseRef> --force
+   git -C <clone> -c core.attributesFile="<skill dir>/diff.gitattributes" diff --no-color --no-ext-diff -M "origin/<baseRef>...refs/walkthrough/pr<n>" > ./tmp/pr-walkthrough/<n>.diff
+   ```
+
+   Fetching writes only refs, never the working tree, so it is safe in a clone someone is using.
+   With no clone, fall back to `gh pr diff <n> --repo <owner/repo>`. Either way, check the file list
+   in the diff against the `files` list from step 1; if they disagree, re-fetch.
 3. **Get the why.** Read the PR body. If it references a ticket (Linear/Jira id in branch, title, or
    body), pull the ticket. If the why is not stated in either, write "Not stated in the PR or
    ticket" — never invent a motive.
