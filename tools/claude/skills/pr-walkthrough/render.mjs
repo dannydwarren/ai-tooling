@@ -620,7 +620,9 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
 @media (min-width: 1100px) { main { padding: 2rem 1rem 5rem; } }
 
 .masthead { max-width: 62ch; margin-bottom: 1.75rem; }
-.eyebrow { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-faint); display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.eyebrow { font-family: var(--mono); font-size: 0.78rem; color: var(--ink-faint); display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: baseline; }
+.pr-link { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.pr-link:hover { border-bottom-color: var(--accent); }
 .masthead h1 {
   font-size: clamp(1.5rem, 3.2vw, 2.1rem); line-height: 1.2; text-wrap: balance;
   margin: 0.6rem 0 1rem; font-weight: 600; letter-spacing: -0.015em;
@@ -765,7 +767,9 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
   <main>
     <header class="masthead">
       <div class="eyebrow">
-        <span>${esc(meta.repo ?? '')} #${esc(meta.number ?? '')}</span>
+        ${meta.url
+          ? `<a class="pr-link" href="${esc(meta.url)}">${esc(meta.repo ?? '')} #${esc(meta.number ?? '')}</a>`
+          : `<span>${esc(meta.repo ?? '')} #${esc(meta.number ?? '')}</span>`}
         <span>${esc(meta.author ?? '')}</span>
         <span>${esc(meta.head ?? '')} → ${esc(meta.base ?? '')}</span>
         <span class="totals">+${totals.added} −${totals.removed} · ${files.length} files</span>
@@ -773,7 +777,6 @@ main { padding: 1.4rem 0.75rem 5rem; min-width: 0; }
       <h1>${esc(meta.title ?? '')}</h1>
       <div class="lede">${paragraphs(notes.summary)}</div>
       <div class="why"><h3>Why</h3>${paragraphs(notes.why)}</div>
-      ${meta.url ? `<p class="totals"><a href="${esc(meta.url)}">${esc(meta.url)}</a></p>` : ''}
     </header>
     <div class="toolbar"><div class="seg" role="group" aria-label="Diff view"><button type="button" data-set="split">Side by side</button><button type="button" data-set="unified">Unified</button></div><label class="skin"><span>Theme</span><select id="skin">${skinOptions}</select></label></div>
     ${fileHtml}
