@@ -10,7 +10,10 @@ coverage: each lane targets the surviving code a change could have touched, and 
 which change it covers. Point it at dev while the branch is deployed, read `summary.json`, then
 let `analyze-run` check the same calls from Datadog's side.
 
-It writes. Lane C re-saves the fixture task with the fields it just read. Nothing else writes.
+It writes. Lane C re-saves the fixture task with the fields it just read. Lane F re-saves the fixture
+contact, job, invoice, credit memo and material order the same way. Lane G creates a contact, job,
+task and estimate, edits them, completes the task, and soft-deletes all four at the end, even when
+an earlier step fails.
 
 ## Layout
 
@@ -39,7 +42,7 @@ DM_RUN_ID=<id> bash $H/run-and-analyze.sh
 ```
 
 `DM_RUN_ID` is mandatory, 6–12 lowercase alphanumerics, fresh per run. It names the output
-directory and every probe marker. A run is about 31 calls and finishes in seconds; `analyze-run`
+directory and every probe marker. A run is about 65 calls and finishes in about a minute, most of it lane G waiting for activities; `analyze-run`
 then waits until the last call is three minutes old so ingestion has caught up.
 
 One lane on its own:
@@ -74,6 +77,8 @@ names the deletion it covers.
 | C `c-tasks-shares` | `getshare` (`ActivityInfo` list, `AttachmentAction.getAttachments`), `gettask`, and an `updatetask` echo that binds `TaskInfo` with an `ActivityInfo` collection |
 | D `d-hydration` | Activities Platform API lists at `Self` and `Connected`; both make the platform call `GET /api2/activities/ids` |
 | E `e-deprecation` | `DeprecatedEndpointAttribute` still adds `Deprecation` and `Link` on a Files route |
+| F `f-edits` | The edit path on other entities: each fixture record is read through its legacy `get…` route and posted back to `update…`. A save writes a side-effect activity through `IActivityAction.AddActivity` and `ActivityRepository.Save`. |
+| G `g-creates` | The create path, the way webappui does it: blank template from `get…`, then `update…` for a contact, a job on it, a task and an estimate. Then edits, task `complete`, a check that the new job's side-effect activities reach the Activities Platform API, and `…methods?action=delete` cleanup. |
 
 ## Reading a run
 
@@ -87,6 +92,20 @@ change.
 
 Legacy list endpoints return `IsSuccess: false` with populated data; that flag is not a failure
 signal there. `updatetask` does return a real `IsSuccess`.
+
+Legacy writes answer 200 even when they refuse the save, so lanes F and G `check` `IsSuccess` and
+put the refusal message in the call's `note`. Refusals seen so far are business rules, not
+regressions:
+
+- "Signatures have been requested for this estimate" — an estimate with requested signatures can't
+  be edited, which is why lane F leaves estimates to lane G.
+- "Please add at least one item to your financial record" — lane G copies the fixture estimate's
+  items.
+- "<field>: <label> is required" — an account-level required custom field; lane G copies the
+  fixture's `custom_fields`.
+
+`getestimate?jobid=` answers 500 (a NullReferenceException in `EstimateService.GetEstimate`) when
+the job was saved a moment earlier and reads back null. Lane G waits 5 s before it.
 
 ## Analyzing a run (`analyze-run`)
 
@@ -119,7 +138,8 @@ Read-only. Writes `analysis.json` next to `summary.json` and exits 0 when clean.
 A lane is a call sequence wrapped in `runLane`. Every call declares `expect` (a status, a list,
 `{ authorized: true }` for "not 401/403 and below 500", or `{ below: 500 }`) and a `why` naming
 the change it covers; the client throws at call time if either is missing. `requireHeaders`
-fails a call that lacks a response header.
+fails a call that lacks a response header. `check(body)` returns `true` or a failure detail, for
+responses whose status says nothing — `savedOk` in `lib/checks.mjs` reads a legacy `IsSuccess`.
 
 For a new change, add a lane per surviving surface the change touches, register it in
 `run-all.sh`, and prefer read calls. Use `gate(name, ok, detail)` only for preconditions — a

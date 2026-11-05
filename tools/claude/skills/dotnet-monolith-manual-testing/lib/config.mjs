@@ -64,6 +64,22 @@ export const FIXTURES = Object.freeze({
     get INVOICE() {
         return requireId('invoice id', 'DM_INVOICE_ID', process.env.DM_INVOICE_ID || cachedRecordId('invoice'));
     },
+    get CONTACT() {
+        return requireId('contact id', 'DM_CONTACT_ID', process.env.DM_CONTACT_ID || cachedRecordId('contact'));
+    },
+    get ESTIMATE() {
+        return requireId('estimate id', 'DM_ESTIMATE_ID', process.env.DM_ESTIMATE_ID || cachedRecordId('estimate'));
+    },
+    get CREDIT_MEMO() {
+        return requireId('credit memo id', 'DM_CREDIT_MEMO_ID', process.env.DM_CREDIT_MEMO_ID || cachedRecordId('creditmemo'));
+    },
+    get MATERIAL_ORDER() {
+        return requireId(
+            'material order id',
+            'DM_MATERIAL_ORDER_ID',
+            process.env.DM_MATERIAL_ORDER_ID || cachedRecordId('materialorder'),
+        );
+    },
     ACTIVITY_TYPE_ID: process.env.DM_ACTIVITY_TYPE_ID || '1',
     FILE_TYPE_ID: process.env.DM_FILE_TYPE_ID || '1',
 });

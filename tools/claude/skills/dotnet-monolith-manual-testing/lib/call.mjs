@@ -54,6 +54,7 @@ export function createClient(lane) {
             body,
             expect,
             requireHeaders = [],
+            check,
             why,
             note,
             entityJnid,
@@ -135,7 +136,13 @@ export function createClient(lane) {
             }
         }
         const missingHeaders = requireHeaders.filter((h) => !(h.toLowerCase() in captured));
-        const pass = meets(expect, res.status) && missingHeaders.length === 0;
+        const checkResult = check ? runCheck(check, parsed) : true;
+        const pass = meets(expect, res.status) && missingHeaders.length === 0 && checkResult === true;
+        const problems = [
+            missingHeaders.length ? `missing headers: ${missingHeaders.join(', ')}` : null,
+            checkResult === true ? null : `check failed: ${checkResult}`,
+            note,
+        ].filter(Boolean);
 
         append(lane, {
             lane,
@@ -157,13 +164,22 @@ export function createClient(lane) {
             responseFile,
             entityJnid,
             why,
-            note: missingHeaders.length ? `missing headers: ${missingHeaders.join(', ')}${note ? `; ${note}` : ''}` : note,
+            note: problems.length ? problems.join('; ') : undefined,
         });
 
         return { status: res.status, ok: res.ok, body: parsed, text, headers: captured, pass };
     }
 
     return { call, marker: (c) => marker(lane, c) };
+}
+
+function runCheck(check, body) {
+    try {
+        const result = check(body);
+        return result === true ? true : String(result || 'returned false');
+    } catch (err) {
+        return `threw ${err.message}`;
+    }
 }
 
 function tryParse(text) {

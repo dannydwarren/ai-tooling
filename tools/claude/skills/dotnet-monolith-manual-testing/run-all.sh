@@ -13,7 +13,7 @@ export DM_OUTPUT_ROOT="${DM_OUTPUT_ROOT:-C:/src/tmp/dotnet-api2-runs}"
 LOG_DIR="$DM_OUTPUT_ROOT/$DM_RUN_ID/logs"
 mkdir -p "$LOG_DIR"
 
-LANES=(a-retired b-auth c-tasks-shares d-hydration e-deprecation)
+LANES=(a-retired b-auth c-tasks-shares d-hydration e-deprecation f-edits g-creates)
 
 echo "dotnet-monolith API2   run $DM_RUN_ID   lanes ${#LANES[@]}"
 
